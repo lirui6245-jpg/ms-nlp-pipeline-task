@@ -11,6 +11,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.metrics import classification_report, f1_score
 import numpy as np
+import warnings
+from sklearn.exceptions import ConvergenceWarning
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 # =====================================================================
 # 0. 模拟企业级业务语料库 (1=正向评价/好评, 0=负向评价/差评)
@@ -227,7 +230,9 @@ def main():
         verbose=1
     )
 
-    svm_grid.fit(X_train, y_train)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ConvergenceWarning)
+        svm_grid.fit(X_train, y_train)
     print(f"\n✅ 最优参数: {svm_grid.best_params_}")
     print(f"✅ 最优 CV F1 分数: {svm_grid.best_score_:.4f}")
 

@@ -379,5 +379,5 @@ $$
 
 ---
 
-*报告生成时间：2026年7月*
+*报告生成时间：2026年8月*
 *实验环境：MacBook Air M5, Python 3.9, PyTorch 2.8, scikit-learn 1.6*

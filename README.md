@@ -1,83 +1,112 @@
-# NLP 基础工程闭环任务 (Text Cleaning -> TF-IDF -> BiLSTM / ML Tuning)
+# NLP 基础工程闭环任务
 
-本项目为微软实习期间交付的自然语言处理（NLP）基础工程闭环任务实现。代码完全采用面向对象与模块化管道（Pipeline）设计，实现了工业级预处理、统计特征向量化、深度学习序列分类以及传统机器学习模型调优的整合。
+文本清洗 → 手写TF-IDF → BiLSTM / ML Tuning → 特征工程 → 全模型对比
 
 ## 项目结构
 
-    ms-nlp-pipeline-task/
-    ├── task1/
-    │   └── ms_nlp_pipeline.py      # 第一阶段：文本清洗 + 手写TF-IDF + BiLSTM二分类
-    ├── task2/
-    │   ├── grid_search.py           # 第二阶段：基于手写TF-IDF的超参网格搜索 + 5折CV
-    │   └── data_generator.py        # 数据生成脚本（扩充语料以支持5折交叉验证）
-    ├── README.md
-    └── requirements.txt
+```
+ms-nlp-pipeline-task/
+├── task1/
+│   ├── ms_nlp_pipeline.py      # Phase 1: 文本清洗 + 手写TF-IDF + BiLSTM基线
+│   └── lstm_fixed.py           # Phase 1修复: EarlyStopping + Dropout + 梯度裁剪 + 双池化
+├── task2/
+│   ├── grid_search.py           # Phase 2: 超参网格搜索 + 5折分层CV
+│   └── data_generator.py        # 数据生成脚本
+├── task3/
+│   ├── ablation_study.py        # Phase 3-1: L1/L2/ElasticNet消融实验
+│   ├── heatmap_visualization.py # Phase 3-2: 网格搜索热力图可视化
+│   ├── ngram_sentiment_features.py # Phase 3-3: N-gram + 情感加权
+│   └── grid_search_heatmap.png  # 热力图输出
+├── task4/
+│   ├── tree_models_comparison.py  # Phase 4-1: RF/XGBoost vs LR/SVM
+│   ├── deep_models_comparison.py  # Phase 4-2: TextCNN / BiLSTM+Attention / BiLSTM(Fixed)
+│   └── final_summary.py         # Phase 4-3: 全模型汇总 + 混淆矩阵
+├── EXPERIMENT_REPORT.md         # 完整实验报告
+└── requirements.txt
+```
 
-## 1. 快速启动 (Quick Start)
+## 快速启动
 
-### 环境安装
-    pip3 install -r requirements.txt
+```bash
+pip3 install -r requirements.txt
 
-### 运行第一阶段
-    python3 task1/ms_nlp_pipeline.py
+# Phase 1: 基础Pipeline
+python3 task1/ms_nlp_pipeline.py
 
-### 运行第二阶段
-    python3 task2/grid_search.py
+# Phase 1: 修复版LSTM
+python3 task1/lstm_fixed.py
 
-## 2. 第一阶段：文本预处理与深度学习基线
+# Phase 2: 网格搜索
+python3 task2/grid_search.py
 
-**文件**: task1/ms_nlp_pipeline.py
+# Phase 3: 消融实验
+python3 task3/ablation_study.py
 
-### 实现内容
-1. **工业级文本清洗管道**
-   - 繁简转换（zhconv）
-   - 特殊符号/表情过滤（正则）
-   - 结巴分词 + 停用词剔除
-   - 细粒度分句
+# Phase 3: 热力图
+python3 task3/heatmap_visualization.py
 
-2. **手写 TF-IDF 特征提取**
-   - 严格遵循 sklearn 平滑 IDF 公式：idf(t) = log((1 + n_samples) / (1 + df(t))) + 1
-   - 支持 max_features 限制词表规模
+# Phase 3: N-gram特征
+python3 task3/ngram_sentiment_features.py
 
-3. **BiLSTM 情感二分类模型**
-   - 双向 LSTM 捕获上下文特征
-   - 动态 Padding 节省内存
-   - BCELoss + Adam 优化器
+# Phase 4: 树模型对比
+python3 task4/tree_models_comparison.py
 
-## 3. 第二阶段：传统机器学习模型调优
+# Phase 4: 深度学习对比
+python3 task4/deep_models_comparison.py
 
-**文件**: task2/grid_search.py
+# Phase 4: 全模型汇总
+python3 task4/final_summary.py
+```
 
-### 任务目标
-基于第一阶段手写的 TF-IDF 特征，对 LogisticRegression 和 LinearSVM 进行超参网格搜索，通过 5 折分层交叉验证选出最优参数组合。
+## 各阶段说明
 
-### 实现内容
-1. **特征矩阵转换**
-   - 将手写 TF-IDF 的字典稀疏表示转换为 numpy 稠密矩阵，适配 sklearn 接口
+### Phase 1: 文本预处理与深度学习基线
+- 工业级文本清洗（繁简转换、HTML/URL过滤、结巴分词、停用词剔除、细粒度分句）
+- 手写TF-IDF（严格遵循sklearn平滑IDF公式）
+- BiLSTM二分类（Embedding → BiLSTM → 全局平均池化 → FC）
 
-2. **超参网格搜索（GridSearchCV）**
-   - **LogisticRegression**: 搜索正则化系数 C、惩罚项 penalty（l1/l2）
-   - **LinearSVM**: 搜索 C、penalty、loss（hinge/squared_hinge），并处理参数兼容性问题（l1 仅支持 squared_hinge + dual=False）
+### Phase 1修复: LSTM过拟合修复
+- EarlyStopping (patience=5)
+- Dropout 0.5（Embedding/LSTM/FC全链路）
+- 梯度裁剪（max_norm=1.0）
+- 双池化（平均池化 + 最大池化）
+- 学习率衰减（ReduceLROnPlateau）
+- 权重衰减（weight_decay=1e-3）
 
-3. **5 折分层交叉验证（StratifiedKFold）**
-   - 保证每折训练/验证集中正负样本比例一致
-   - 评估指标：F1-score（关注正类召回）
+### Phase 2: 传统机器学习调优
+- 基于手写TF-IDF特征
+- LogisticRegression / LinearSVM 网格搜索
+- 5折分层交叉验证（StratifiedKFold）
+- 最优参数：LR(C=10,l2), SVM(C=10,l2,hinge)
 
-4. **模型评估与对比**
-   - 输出每组模型的最优超参与 CV 分数
-   - 在独立测试集上进行最终评估
+### Phase 3: 扩展实验
+- **消融实验**: L1/L2/ElasticNet正则对比，输出关键词权重
+- **热力图**: C值 vs Penalty/Loss 的CV F1热力图可视化
+- **特征工程**: N-gram(1,2) + 情感加权（正面/负面词×1.5）
 
-### 实验结果
+### Phase 4: 全面模型对比
+- **树模型**: RandomForest、XGBoost vs 线性模型
+- **深度学习**: TextCNN、BiLSTM+Attention、BiLSTM(Fixed)
+- **汇总**: 全部7个模型的Precision/Recall/F1/AUC + 混淆矩阵
 
-| 模型 | 最优超参 | 5折CV F1 | 测试集 F1 |
-|------|---------|---------|----------|
-| LogisticRegression | C=10, penalty=l2 | 0.8667 | 1.0000 |
-| LinearSVM | C=10, penalty=l2, loss=hinge | **0.9333** | 1.0000 |
+## 核心结论
 
-**结论**: LinearSVM 在交叉验证中表现更优（CV F1: 0.9333 vs 0.8667），测试集上两个模型均达到完美分类。该结果验证了手写 TF-IDF 特征对传统线性分类器的有效性。
+| 数据规模 | 推荐模型 | 原因 |
+|---------|---------|------|
+| < 1,000条 | LR / SVM + 特征工程 | 简单模型避免过拟合 |
+| 1,000-10,000条 | RF / TextCNN | 树模型抗过拟合，CNN捕获局部模式 |
+| 10,000-100,000条 | BiLSTM+Attn / XGBoost | 足够数据训练复杂模型 |
+| > 100,000条 | BERT / Transformer | 预训练+微调达到SOTA |
 
-## 4. 技术要点
+**关键发现**:
+- 小数据集（30条）下线性模型最优，LSTM严重过拟合
+- 情感加权将CV F1从0.9333提升到1.0000
+- Bi-gram在小数据上因维度膨胀导致过拟合
+- RF通过bagging抗过拟合，XGBoost的boosting在小数据上失效
 
-- **分层抽样**: 二分类任务中，数据划分与交叉验证均使用 stratify=y 或 StratifiedKFold，确保类别平衡
-- **参数兼容性**: LinearSVM 的 l1 惩罚与 hinge loss 不兼容，通过分组参数网格（list of dicts）避免无效组合
-- **数据扩充**: 为支持 5 折交叉验证的最小样本要求，将模拟语料从 10 条扩充至 30 条（正负类各 15 条）
+## 环境
+
+- Python 3.9+
+- PyTorch 2.x
+- scikit-learn 1.6+
+- xgboost, jieba, zhconv, matplotlib, seaborn

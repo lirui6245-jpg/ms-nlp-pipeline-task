@@ -64,7 +64,8 @@ class TextPreprocessor:
 
     def tokenize(self, text: str) -> List[str]:
         tokens = jieba.cut(text)
-        return [t for t in tokens if t.strip() and t not in self.stop_words]
+        return [t for t in tokens if t.strip() and t not in self.stop_words
+                and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 class CustomTfidfVectorizer:
     def __init__(self, max_features: int = 1000):
@@ -232,7 +233,7 @@ def main():
         'n_estimators': [50, 100],
         'subsample': [0.8, 1.0]
     }
-    xgb_grid = GridSearchCV(xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss'), 
+    xgb_grid = GridSearchCV(xgb.XGBClassifier(random_state=42, eval_metric='logloss'), 
                             xgb_params, cv=cv, scoring='f1', n_jobs=-1)
     xgb_grid.fit(X_train, y_train)
     print(f"✅ XGBoost 最优参数: {xgb_grid.best_params_}")

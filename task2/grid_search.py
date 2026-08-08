@@ -71,9 +71,10 @@ class TextPreprocessor:
         return re.sub(r'\s+', ' ', text).strip()
 
     def tokenize(self, text: str) -> List[str]:
-        """结巴分词并剔除停用词"""
+        """结巴分词并剔除停用词与标点"""
         tokens = jieba.cut(text)
-        return [t for t in tokens if t.strip() and t not in self.stop_words]
+        return [t for t in tokens if t.strip() and t not in self.stop_words
+                and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 
 # =====================================================================

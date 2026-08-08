@@ -65,7 +65,8 @@ class TextPreprocessor:
 
     def tokenize(self, text: str) -> List[str]:
         tokens = jieba.cut(text)
-        return [t for t in tokens if t.strip() and t not in self.stop_words]
+        return [t for t in tokens if t.strip() and t not in self.stop_words
+                and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 
 # =====================================================================

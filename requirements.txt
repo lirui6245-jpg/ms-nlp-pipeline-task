@@ -1,3 +1,8 @@
-torch
+torch>=2.0
 jieba
 zhconv
+numpy
+scikit-learn>=1.6
+xgboost>=2.0
+matplotlib
+seaborn

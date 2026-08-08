@@ -10,6 +10,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from sklearn.metrics import classification_report, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.model_selection import train_test_split
 
 # =====================================================================
 # 0. 数据
@@ -62,7 +63,8 @@ class TextPreprocessor:
 
     def tokenize(self, text: str) -> List[str]:
         tokens = jieba.cut(text)
-        return [t for t in tokens if t.strip() and t not in self.stop_words]
+        return [t for t in tokens if t.strip() and t not in self.stop_words
+                and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 
 # =====================================================================
@@ -186,15 +188,14 @@ def main():
         seq = [word2idx.get(w, word2idx["<UNK>"]) for w in doc]
         sequences.append(seq)
 
-    # 划分训练/验证/测试 (6:2:2)
-    n = len(sequences)
-    indices = list(range(n))
-    np.random.seed(42)
-    np.random.shuffle(indices)
-
-    train_idx = indices[:18]
-    val_idx = indices[18:24]
-    test_idx = indices[24:]
+    # 分层划分训练/验证/测试 (6:2:2)，保证各子集均含正负样本
+    indices = list(range(len(sequences)))
+    train_idx, temp_idx, _, temp_labels = train_test_split(
+        indices, labels, test_size=0.4, random_state=42, stratify=labels
+    )
+    val_idx, test_idx, _, _ = train_test_split(
+        temp_idx, temp_labels, test_size=0.5, random_state=42, stratify=temp_labels
+    )
 
     train_seqs = [sequences[i] for i in train_idx]
     train_labels = [labels[i] for i in train_idx]

@@ -1,3 +1,4 @@
+import os
 import re
 import math
 from collections import Counter, defaultdict
@@ -13,6 +14,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
+from sklearn.metrics import f1_score
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -65,7 +67,8 @@ class TextPreprocessor:
 
     def tokenize(self, text: str) -> List[str]:
         tokens = jieba.cut(text)
-        return [t for t in tokens if t.strip() and t not in self.stop_words]
+        return [t for t in tokens if t.strip() and t not in self.stop_words
+                and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 class CustomTfidfVectorizer:
     def __init__(self, max_features: int = 1000):
@@ -247,8 +250,9 @@ axes[1].set_xlabel('Regularization Coefficient (C)')
 axes[1].set_ylabel('Loss Function')
 
 plt.tight_layout()
-plt.savefig('/Users/lee/ms-nlp-pipeline-task/task2/grid_search_heatmap.png', dpi=150, bbox_inches='tight')
-print("\n✅ 热力图已保存: task2/grid_search_heatmap.png")
+save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'grid_search_heatmap.png')
+plt.savefig(save_path, dpi=150, bbox_inches='tight')
+print(f"\n✅ 热力图已保存: {save_path}")
 plt.show()
 
 # =====================================================================

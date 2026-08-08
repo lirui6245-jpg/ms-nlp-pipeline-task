@@ -214,6 +214,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=4, collate_fn=collate_fn)
 
     # 5.2 模型初始化
+    torch.manual_seed(42)  # 固定 PyTorch 随机种子，保证实验可复现
     model = BiLSTMClassifierFixed(
         vocab_size=len(word2idx), 
         embed_dim=16, 

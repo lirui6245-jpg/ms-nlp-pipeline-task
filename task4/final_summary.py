@@ -430,6 +430,7 @@ def main():
     print("\n" + "=" * 70)
     print(" 🧠 训练深度学习模型")
     print("=" * 70)
+    torch.manual_seed(42)  # 固定 PyTorch 随机种子，保证实验可复现
     criterion = nn.BCELoss()
     vocab_size = len(word2idx)
 

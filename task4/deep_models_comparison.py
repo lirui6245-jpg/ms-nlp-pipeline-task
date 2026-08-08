@@ -357,6 +357,7 @@ def main():
     test_loader = DataLoader(TextDataset(test_seqs, test_labels), batch_size=4, collate_fn=collate_fn)
 
     vocab_size = len(word2idx)
+    torch.manual_seed(42)  # 固定 PyTorch 随机种子，保证实验可复现
     criterion = nn.BCELoss()
     results = []
 

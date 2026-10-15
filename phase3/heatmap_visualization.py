@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # =====================================================================
-# 0. 数据
+# 0. Data
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -107,7 +107,7 @@ class CustomTfidfVectorizer:
         return self.fit(tokenized_docs).transform(tokenized_docs)
 
 # =====================================================================
-# 1. 数据预处理
+# 1. Data preprocessing
 # =====================================================================
 preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
 tokenized_docs = []
@@ -139,14 +139,14 @@ X_train, X_test, y_train, y_test = train_test_split(
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
 # =====================================================================
-# 2. 网格搜索并收集所有结果（用于热力图）
+# 2. Grid search and collect all results (for the heatmap)
 # =====================================================================
 print("=" * 70)
-print(" 🔥 网格搜索 + 热力图可视化")
+print(" 🔥 Grid Search + Heatmap Visualization")
 print("=" * 70)
 
 # 2.1 Logistic Regression: C vs penalty (L1/L2)
-print("\n--- [Logistic Regression: C vs Penalty 网格搜索] ---")
+print("\n--- [Logistic Regression: C vs Penalty grid search] ---")
 lr_params = {
     'C': [0.001, 0.01, 0.1, 1, 10, 100],
     'penalty': ['l1', 'l2'],
@@ -165,15 +165,15 @@ lr_grid = GridSearchCV(
 )
 lr_grid.fit(X_train, y_train)
 
-# 提取结果
+# Extract results
 lr_results = lr_grid.cv_results_
 lr_c_values = [0.001, 0.01, 0.1, 1, 10, 100]
 
-# 构建热力图数据
+# Build heatmap data
 lr_l1_scores = []
 lr_l2_scores = []
 for c in lr_c_values:
-    # 找到对应 C 值的 mean_test_score
+    # Find the mean_test_score for the corresponding C value
     l1_mask = (lr_results['param_C'] == c) & (lr_results['param_penalty'] == 'l1')
     l2_mask = (lr_results['param_C'] == c) & (lr_results['param_penalty'] == 'l2')
     
@@ -184,7 +184,7 @@ for c in lr_c_values:
     lr_l2_scores.append(l2_score)
 
 # 2.2 Linear SVM: C vs loss (hinge/squared_hinge)
-print("--- [Linear SVM: C vs Loss 网格搜索] ---")
+print("--- [Linear SVM: C vs Loss grid search] ---")
 svm_params = [
     {'penalty': ['l2'], 'loss': ['hinge', 'squared_hinge'], 
      'C': [0.001, 0.01, 0.1, 1, 10, 100], 'dual': [True], 'max_iter': [5000]},
@@ -217,11 +217,11 @@ for c in svm_c_values:
     svm_squared_scores.append(squared_score)
 
 # =====================================================================
-# 3. 绘制热力图
+# 3. Plot the heatmaps
 # =====================================================================
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-# 3.1 LR 热力图
+# 3.1 LR heatmap
 lr_data = np.array([lr_l1_scores, lr_l2_scores])
 sns.heatmap(lr_data, 
             xticklabels=[str(c) for c in lr_c_values],
@@ -235,7 +235,7 @@ axes[0].set_title('Logistic Regression: C vs Penalty', fontsize=12, fontweight='
 axes[0].set_xlabel('Regularization Coefficient (C)')
 axes[0].set_ylabel('Penalty Type')
 
-# 3.2 SVM 热力图
+# 3.2 SVM heatmap
 svm_data = np.array([svm_hinge_scores, svm_squared_scores])
 sns.heatmap(svm_data,
             xticklabels=[str(c) for c in svm_c_values],
@@ -252,37 +252,37 @@ axes[1].set_ylabel('Loss Function')
 plt.tight_layout()
 save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'grid_search_heatmap.png')
 plt.savefig(save_path, dpi=150, bbox_inches='tight')
-print(f"\n✅ 热力图已保存: {save_path}")
+print(f"\n✅ Heatmap saved: {save_path}")
 plt.show()
 
 # =====================================================================
-# 4. 分析：为什么调参仅小幅提升
+# 4. Analysis: why hyperparameter tuning only yields small improvements
 # =====================================================================
 print("\n" + "=" * 70)
-print(" 📊 调参效果分析")
+print(" 📊 Hyperparameter Tuning Effect Analysis")
 print("=" * 70)
 
-print(f"\nLR 默认参数 (C=1.0, penalty=l2) CV F1: ", end="")
+print(f"\nLR default params (C=1.0, penalty=l2) CV F1: ", end="")
 default_lr = LogisticRegression(random_state=42, max_iter=1000)
 default_lr.fit(X_train, y_train)
 default_pred = default_lr.predict(X_test)
 print(f"{f1_score(y_test, default_pred):.4f}")
 
-print(f"LR 最优参数 (C=10, penalty=l2) CV F1: {lr_grid.best_score_:.4f}")
-print(f"提升幅度: {(lr_grid.best_score_ - f1_score(y_test, default_pred)) / f1_score(y_test, default_pred) * 100:.1f}%")
+print(f"LR best params (C=10, penalty=l2) CV F1: {lr_grid.best_score_:.4f}")
+print(f"Improvement: {(lr_grid.best_score_ - f1_score(y_test, default_pred)) / f1_score(y_test, default_pred) * 100:.1f}%")
 
-print(f"\nSVM 默认参数 (C=1.0) CV F1: ", end="")
+print(f"\nSVM default params (C=1.0) CV F1: ", end="")
 default_svm = LinearSVC(random_state=42, max_iter=5000)
 default_svm.fit(X_train, y_train)
 default_pred = default_svm.predict(X_test)
 print(f"{f1_score(y_test, default_pred):.4f}")
 
-print(f"SVM 最优参数 (C=10, loss=hinge) CV F1: {svm_grid.best_score_:.4f}")
-print(f"提升幅度: {(svm_grid.best_score_ - f1_score(y_test, default_pred)) / f1_score(y_test, default_pred) * 100:.1f}%")
+print(f"SVM best params (C=10, loss=hinge) CV F1: {svm_grid.best_score_:.4f}")
+print(f"Improvement: {(svm_grid.best_score_ - f1_score(y_test, default_pred)) / f1_score(y_test, default_pred) * 100:.1f}%")
 
-print("\n💡 原因分析:")
-print("1. 数据集规模小(30条)，模型很快达到性能上限")
-print("2. TF-IDF特征维度低(93维)，信息表达能力有限")
-print("3. 线性模型本身简单，超参调整空间有限")
-print("4. 数据分布清晰，默认参数已能较好分离正负样本")
-print("5. 大幅调参提升需要更复杂的特征工程或非线性模型")
+print("\n💡 Root cause analysis:")
+print("1. The dataset is small (30 samples), so the model quickly reaches its performance ceiling")
+print("2. TF-IDF features have low dimensionality (93 dimensions), limiting information capacity")
+print("3. Linear models are inherently simple, leaving limited room for hyperparameter tuning")
+print("4. The data distribution is clean, so default parameters already separate classes well")
+print("5. Large tuning gains would require more complex feature engineering or non-linear models")

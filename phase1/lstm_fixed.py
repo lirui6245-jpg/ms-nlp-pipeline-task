@@ -13,7 +13,7 @@ from sklearn.metrics import classification_report, f1_score, precision_score, re
 from sklearn.model_selection import train_test_split
 
 # =====================================================================
-# 0. 数据
+# 0. Data
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -49,7 +49,7 @@ RAW_CORPUS = [
 ]
 
 # =====================================================================
-# 1. 文本清洗
+# 1. Text Cleaning
 # =====================================================================
 class TextPreprocessor:
     def __init__(self, stop_words: List[str] = None):
@@ -68,7 +68,7 @@ class TextPreprocessor:
 
 
 # =====================================================================
-# 2. 修复后的 BiLSTM 模型
+# 2. Fixed BiLSTM Model
 # =====================================================================
 class BiLSTMClassifierFixed(nn.Module):
     def __init__(self, vocab_size: int, embed_dim: int = 32, hidden_dim: int = 32, 
@@ -77,7 +77,7 @@ class BiLSTMClassifierFixed(nn.Module):
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
         self.dropout = nn.Dropout(dropout_rate)
         
-        # 多层 BiLSTM + Dropout between layers
+        # Multi-layer BiLSTM + Dropout between layers
         self.lstm = nn.LSTM(
             embed_dim, hidden_dim, 
             num_layers=num_layers,
@@ -86,7 +86,7 @@ class BiLSTMClassifierFixed(nn.Module):
             dropout=dropout_rate if num_layers > 1 else 0
         )
         
-        # 更大的全连接层 + Dropout
+        # Larger fully-connected layer + Dropout
         self.fc1 = nn.Linear(hidden_dim * 2, hidden_dim)
         self.relu = nn.ReLU()
         self.dropout_fc = nn.Dropout(dropout_rate)
@@ -97,7 +97,7 @@ class BiLSTMClassifierFixed(nn.Module):
         embeds = self.dropout(self.embedding(x))
         lstm_out, _ = self.lstm(embeds)
         
-        # 全局平均池化 + 最大池化（双池化）
+        # Global average pooling + max pooling (dual pooling)
         avg_pool = torch.mean(lstm_out, dim=1)
         max_pool, _ = torch.max(lstm_out, dim=1)
         pooled = avg_pool + max_pool
@@ -110,7 +110,7 @@ class BiLSTMClassifierFixed(nn.Module):
 
 
 # =====================================================================
-# 3. 数据管道
+# 3. Data Pipeline
 # =====================================================================
 class TextDataset(Dataset):
     def __init__(self, sequences: List[List[int]], labels: List[int]):
@@ -157,14 +157,14 @@ class EarlyStopping:
 
 
 # =====================================================================
-# 5. 主流程
+# 5. Main Pipeline
 # =====================================================================
 def main():
     print("=" * 70)
     print(" 🧠 Fixed BiLSTM with Early Stopping & Enhanced Regularization")
     print("=" * 70)
 
-    # 5.1 数据预处理
+    # 5.1 Data preprocessing
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
     tokenized_docs = []
     labels = []
@@ -175,20 +175,20 @@ def main():
         tokenized_docs.append(tokens)
         labels.append(label)
 
-    # 构建词表
+    # Build vocabulary
     word2idx = {"<PAD>": 0, "<UNK>": 1}
     for doc in tokenized_docs:
         for word in doc:
             if word not in word2idx:
                 word2idx[word] = len(word2idx)
 
-    # 序列化
+    # Encode sequences
     sequences = []
     for doc in tokenized_docs:
         seq = [word2idx.get(w, word2idx["<UNK>"]) for w in doc]
         sequences.append(seq)
 
-    # 分层划分训练/验证/测试 (6:2:2)，保证各子集均含正负样本
+    # Stratified split into train/val/test (6:2:2) so every subset has both classes
     indices = list(range(len(sequences)))
     train_idx, temp_idx, _, temp_labels = train_test_split(
         indices, labels, test_size=0.4, random_state=42, stratify=labels
@@ -213,8 +213,8 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=4, collate_fn=collate_fn)
     test_loader = DataLoader(test_ds, batch_size=4, collate_fn=collate_fn)
 
-    # 5.2 模型初始化
-    torch.manual_seed(42)  # 固定 PyTorch 随机种子，保证实验可复现
+    # 5.2 Model initialization
+    torch.manual_seed(42)  # Fix PyTorch random seed for reproducibility
     model = BiLSTMClassifierFixed(
         vocab_size=len(word2idx), 
         embed_dim=16, 
@@ -228,8 +228,8 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)
     early_stop = EarlyStopping(patience=5)
 
-    # 5.3 训练
-    print("\n--- [开始训练] ---")
+    # 5.3 Training
+    print("\n--- [Start Training] ---")
     best_val_f1 = 0
     
     for epoch in range(1, 101):
@@ -241,7 +241,7 @@ def main():
             preds = model(batch_x)
             loss = criterion(preds, batch_y)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # 梯度裁剪
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Gradient clipping
             optimizer.step()
             train_loss += loss.item()
 
@@ -272,8 +272,8 @@ def main():
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
 
-    # 5.4 测试集评估
-    print("\n--- [测试集评估] ---")
+    # 5.4 Test set evaluation
+    print("\n--- [Test Set Evaluation] ---")
     model.eval()
     test_preds, test_probs, test_true = [], [], []
     with torch.no_grad():
@@ -288,7 +288,7 @@ def main():
     test_probs = np.array(test_probs).flatten()
     test_true = np.array(test_true).flatten()
 
-    # 全方位指标
+    # Full set of metrics
     precision = precision_score(test_true, test_preds)
     recall = recall_score(test_true, test_preds)
     f1 = f1_score(test_true, test_preds)
@@ -301,25 +301,25 @@ def main():
     print("\nClassification Report:")
     print(classification_report(test_true, test_preds, digits=4))
 
-    # 5.5 与线性模型对比
+    # 5.5 Comparison with linear model
     print("\n" + "=" * 70)
-    print(" 📊 BiLSTM vs LinearSVM 全方位指标对比")
+    print(" 📊 BiLSTM vs LinearSVM Full Metric Comparison")
     print("=" * 70)
-    print(f"{'指标':<15} {'BiLSTM':<12} {'LinearSVM':<12}")
+    print(f"{'Metric':<15} {'BiLSTM':<12} {'LinearSVM':<12}")
     print("-" * 40)
     print(f"{'Precision':<15} {precision:<12.4f} {'1.0000':<12}")
     print(f"{'Recall':<15} {recall:<12.4f} {'1.0000':<12}")
     print(f"{'F1-Score':<15} {f1:<12.4f} {'1.0000':<12}")
     print(f"{'AUC':<15} {auc:<12.4f} {'-':<12}")
-    print(f"{'参数量':<15} {sum(p.numel() for p in model.parameters()):<12} {'~100':<12}")
+    print(f"{'Params':<15} {sum(p.numel() for p in model.parameters()):<12} {'~100':<12}")
 
-    print("\n💡 分析:")
-    print("- BiLSTM 参数量大，需要更多数据才能发挥优势")
-    print("- 小数据集下，线性模型已能达到完美分类")
-    print("- LSTM 的序列建模能力在短文本上优势不明显")
+    print("\n💡 Analysis:")
+    print("- BiLSTM has many parameters and needs more data to show its advantage")
+    print("- On small datasets, the linear model already achieves perfect classification")
+    print("- LSTM's sequence modeling ability is not obviously advantageous on short texts")
 
     print("\n" + "=" * 70)
-    print(" 🎉 训练完成！")
+    print(" 🎉 Training complete!")
     print("=" * 70)
 
 

@@ -1,22 +1,27 @@
-# NLP Pipeline 完整实验总结报告
+# Chinese Sentiment Analysis Pipeline — Full Experiment Report
 
-> 微软实习期间 NLP 工程化任务全流程实验记录与分析
-
----
-
-## 一、项目概述
-
-本项目从零构建了一套完整的 NLP 情感分析 Pipeline，涵盖文本预处理、特征工程、传统机器学习模型调优、深度学习模型构建与优化四个阶段。所有实验基于 30 条模拟中文评论数据（15 正/15 负），旨在验证不同模型在小规模数据集上的表现差异。
+> An end-to-end engineering log and analysis of a Chinese sentiment-analysis pipeline, covering
+> preprocessing, feature engineering, classical model tuning, and deep learning baselines.
 
 ---
 
-## 二、实验环境与数据
+## 1. Project overview
 
-### 2.1 实验环境
+This project builds a complete sentiment-analysis pipeline from scratch, covering four stages: text
+preprocessing, feature engineering, classical machine-learning tuning, and the construction and
+regularisation of deep-learning models. All experiments run on a corpus of 30 simulated Chinese
+reviews (15 positive, 15 negative), with the goal of measuring how different model families behave
+when the dataset is deliberately small.
 
-| 项目 | 版本/配置 |
-|------|----------|
-| 操作系统 | macOS (Apple Silicon M5) |
+---
+
+## 2. Environment and data
+
+### 2.1 Environment
+
+| Item | Version / configuration |
+|------|--------------------------|
+| OS | macOS (Apple Silicon M5) |
 | Python | 3.9.6 |
 | PyTorch | 2.8.0 |
 | scikit-learn | 1.6.1 |
@@ -24,32 +29,32 @@
 | NumPy | 2.0.2 |
 | pandas | 2.3.3 |
 
-### 2.2 数据集
+### 2.2 Dataset
 
-- **规模**：30 条中文评论（15 条正向，15 条负向）
-- **来源**：模拟企业级业务语料
-- **划分**：训练集 18 条 / 验证集 6 条 / 测试集 6 条（6:2:2 分层划分）
-- **特点**：文本短、情感词明确、正负样本平衡
+- **Size**: 30 Chinese reviews (15 positive, 15 negative)
+- **Source**: simulated enterprise-grade business corpus
+- **Split**: 18 train / 6 validation / 6 test (6:2:2, stratified)
+- **Characteristics**: short texts, explicit sentiment words, balanced classes
 
 ---
 
-## 三、Phase 1: 基础工程闭环
+## 3. Phase 1: Base engineering pipeline
 
-### 3.1 文本清洗管道
+### 3.1 Text cleaning pipeline
 
-**实现功能**：
+**Implemented steps:**
 
-1. **HTML/URL 过滤**：`re.sub(r'<.*?>|http\\S+|www\\S+', '', text)`
-2. **繁简转换**：`zhconv.convert(text, 'zh-cn')`
-3. **特殊符号过滤**：保留中英文、数字、基础标点，去除表情符号
-4. **结巴分词**：`jieba.cut()` + 停用词与标点 token 剔除
-5. **细粒度分句**：按 `。！？；` 切分长文本
+1. **HTML/URL filtering**: `re.sub(r'<.*?>|http\\S+|www\\S+', '', text)`
+2. **Traditional → Simplified conversion**: `zhconv.convert(text, 'zh-cn')`
+3. **Special-character filtering**: keep Chinese/English characters, digits and basic punctuation; strip emoji
+4. **`jieba` segmentation**: `jieba.cut()` followed by stop-word and punctuation-token removal
+5. **Fine-grained sentence splitting**: split long text on `。！？；`
 
-**代码设计**：面向对象 + 模块化 Pipeline，便于复用和扩展
+**Design**: object-oriented, modular pipeline for easy reuse and extension.
 
-### 3.2 手写 TF-IDF 特征提取
+### 3.2 Hand-written TF-IDF
 
-**公式**：
+**Formulas:**
 
 $$
 \text{idf}(t) = \log\left(\frac{1 + n_{\text{samples}}}{1 + \text{df}(t)}\right) + 1
@@ -59,325 +64,369 @@ $$
 \text{tf-idf}(t, d) = \text{tf}(t, d) \times \text{idf}(t)
 $$
 
-**与 sklearn 对比**：
-- 严格遵循 sklearn 的平滑 IDF 公式
-- 支持 `max_features` 限制词表规模
-- 输出格式：`List[Dict[str, float]]` 稀疏字典表示
+**Comparison with sklearn:**
 
-### 3.3 BiLSTM 二分类模型
+- Follows sklearn's smoothed IDF formula exactly
+- Supports `max_features` to cap vocabulary size
+- Output format: sparse `List[Dict[str, float]]` dictionaries
 
-**模型结构**：
-- Embedding 层（词表大小 × 16 维，padding_idx=0）
-- 双向 LSTM（隐藏层 16 维，单层）
-- 全局平均池化 + 全连接层
-- Sigmoid 输出
+### 3.3 BiLSTM binary classifier
 
-**训练配置**：
+**Architecture:**
+
+- Embedding layer (vocabulary × 16 dimensions, `padding_idx=0`)
+- Bidirectional LSTM (16 hidden dimensions, single layer)
+- Global average pooling + fully connected layer
+- Sigmoid output
+
+**Training configuration:**
+
 - Loss: BCELoss
 - Optimizer: Adam (lr=0.02, weight_decay=1e-4)
-- 动态 Padding 节省内存
+- Dynamic padding to save memory
 
-**关键问题**：原始 BiLSTM 参数量达 6,257，在 30 条样本上严重过拟合
+**Key problem**: the original BiLSTM has 6,257 parameters, which overfits badly on 30 samples.
 
 ---
 
-## 四、Phase 2: 传统机器学习调优
+## 4. Phase 2: Classical machine-learning tuning
 
-### 4.1 任务目标
+### 4.1 Objective
 
-基于手写 TF-IDF 特征，对 LogisticRegression 和 LinearSVM 进行超参网格搜索，使用 5 折分层交叉验证选出最优参数。
+Using the hand-written TF-IDF features, run a hyper-parameter grid search over LogisticRegression
+and LinearSVM, selecting parameters with 5-fold stratified cross-validation.
 
-### 4.2 实验设置
+### 4.2 Setup
 
-| 模型 | 搜索参数 | 搜索范围 |
-|------|---------|---------|
+| Model | Searched parameters | Search space |
+|------|---------------------|--------------|
 | LogisticRegression | C, penalty | [0.001, 0.01, 0.1, 1, 10, 100], [l1, l2] |
 | LinearSVM | C, penalty, loss | [0.001, ..., 100], [l1, l2], [hinge, squared_hinge] |
 
-**交叉验证**：StratifiedKFold(n_splits=5)，保证每折类别平衡
+**Cross-validation**: `StratifiedKFold(n_splits=5)`, keeping class balance in every fold.
 
-### 4.3 实验结果
+### 4.3 Results
 
-| 模型 | 最优超参 | 5折CV F1 | 测试集 F1 |
-|------|---------|---------|----------|
+| Model | Best hyper-parameters | 5-fold CV F1 | Test F1 |
+|------|----------------------|--------------|---------|
 | **LogisticRegression** | **C=1, penalty=l2** | **0.9600** | **1.0000** |
 | **LinearSVM** | **C=0.1, penalty=l2, loss=squared_hinge** | **0.9600** | **1.0000** |
 
-### 4.4 结论
+### 4.4 Conclusion
 
-- **LR 与 LinearSVM 在 CV 中并列最优**（CV F1=0.9600），测试集上均达到完美分类
-- 说明该数据线性可分，简单线性模型已足够胜任
+- **LR and LinearSVM tie for best in cross-validation** (CV F1 = 0.9600), and both classify the test set perfectly.
+- The data is linearly separable, so a simple linear model is already sufficient.
 
 ---
 
-## 五、Phase 3: 扩展实验
+## 5. Phase 3: Extended experiments
 
-### 5.1 任务一：正则消融实验
+### 5.1 Task 1: Regularisation ablation
 
-**实验设计**：
-- LR：L1 / L2 / ElasticNet 三种正则对比
-- SVM：L1 / L2 两种正则对比（SVM 不支持 ElasticNet）
+**Design:**
 
-**实验结果**：
+- LR: L1 / L2 / ElasticNet compared
+- SVM: L1 / L2 compared (SVM has no ElasticNet)
 
-| 模型 | 正则类型 | CV F1 | 测试集 F1 | Top 关键词权重 |
-|------|---------|-------|----------|--------------|
-| LR | L1 | 0.4000 | 0.8000 | 劣质(-5.77), 给力(4.91) |
-| LR | **L2** | **0.9600** | **1.0000** | 专业(0.59), 劣质(-0.52) |
-| LR | **ElasticNet** | **1.0000** | **1.0000** | 专业(3.05), 劣质(-2.51) |
-| SVM | L1 | 0.5333 | 0.8000 | 劣质(-1.49), 给力(1.26) |
-| SVM | **L2** | **0.9600** | **1.0000** | 专业(0.25), 劣质(-0.22) |
+**Results:**
 
-**分析**：ElasticNet / L2 正则显著优于 L1 的原因
-1. **L1 硬截断丢失信息**：小数据集上 L1 将大量特征权重置零，LR-L1 / SVM-L1 的 CV F1 骤降至 0.40 / 0.53
-2. **ElasticNet 兼顾稀疏与平滑**：saga 求解器配合 l1_ratio 网格搜索（0.3/0.5/0.7）取得最优 CV F1=1.0000
-3. **L2 平滑约束稳定**：权重衰减使所有特征温和贡献，LR-L2 / SVM-L2 均达 CV F1=0.9600、测试集完美分类
+| Model | Regularisation | CV F1 | Test F1 | Top keyword weights |
+|------|---------------|-------|---------|---------------------|
+| LR | L1 | 0.4000 | 0.8000 | 劣质 (-5.77), 给力 (4.91) |
+| LR | **L2** | **0.9600** | **1.0000** | 专业 (0.59), 劣质 (-0.52) |
+| LR | **ElasticNet** | **1.0000** | **1.0000** | 专业 (3.05), 劣质 (-2.51) |
+| SVM | L1 | 0.5333 | 0.8000 | 劣质 (-1.49), 给力 (1.26) |
+| SVM | **L2** | **0.9600** | **1.0000** | 专业 (0.25), 劣质 (-0.22) |
 
-### 5.2 任务二：网格搜索热力图
+**Why ElasticNet / L2 beat L1 by such a margin:**
 
-**可视化内容**：
-- LR：C 值（x轴）vs Penalty 类型（y轴）的 CV F1 热力图
-- SVM：C 值（x轴）vs Loss 函数（y轴）的 CV F1 热力图
+1. **L1's hard thresholding destroys information**: on a small dataset, L1 drives many feature
+   weights to exactly zero, and CV F1 collapses to 0.40 (LR-L1) and 0.53 (SVM-L1).
+2. **ElasticNet balances sparsity and smoothness**: the `saga` solver with a grid search over
+   `l1_ratio` (0.3 / 0.5 / 0.7) reaches the best CV F1 of 1.0000.
+3. **L2's smooth constraint is stable**: weight decay lets every feature contribute gently, giving
+   LR-L2 and SVM-L2 a CV F1 of 0.9600 and perfect test-set classification.
 
-**调参仅小幅提升的原因分析**：
+### 5.2 Task 2: Grid-search heat maps
 
-| 原因 | 详细说明 |
-|------|---------|
-| 数据集规模小 | 30 条样本，模型快速达到性能上限 |
-| 特征维度低 | TF-IDF 仅 90 维，信息表达能力有限 |
-| 模型本身简单 | 线性模型的决策边界固定，超参调整空间有限 |
-| 数据分布清晰 | 正负样本情感词差异明显，默认参数已能较好分离 |
-| 缺乏特征交互 | 线性模型无法捕获非线性特征组合 |
+**Visualised:**
 
-### 5.3 任务三：N-gram + 情感加权特征工程
+- LR: CV F1 over C (x-axis) × penalty type (y-axis)
+- SVM: CV F1 over C (x-axis) × loss function (y-axis)
 
-**实验设计**：
-- 基础特征：Uni-gram TF-IDF
-- 扩展特征 1：Bi-gram TF-IDF（引入词序信息）
-- 扩展特征 2：Uni-gram + 情感加权（正面词×1.5，负面词×1.5）
-- 扩展特征 3：Bi-gram + 情感加权
+**Why tuning only brings a small gain:**
 
-**实验结果**：
+| Reason | Detail |
+|------|--------|
+| Dataset is small | 30 samples — models hit their performance ceiling almost immediately |
+| Feature dimension is low | TF-IDF yields only 90 dimensions, capping representational power |
+| Models are simple to begin with | A linear model's decision boundary is fixed, leaving little room for hyper-parameters |
+| Class separation is clear | Positive and negative samples use visibly different sentiment words, so default parameters already separate them well |
+| No feature interactions | Linear models cannot capture non-linear feature combinations |
 
-| 特征方案 | 词表大小 | CV F1 | 测试集 F1 |
-|---------|---------|-------|----------|
+### 5.3 Task 3: N-gram + sentiment-weighted feature engineering
+
+**Design:**
+
+- Base features: Uni-gram TF-IDF
+- Extension 1: Bi-gram TF-IDF (adds word-order information)
+- Extension 2: Uni-gram + sentiment weighting (positive words ×1.5, negative words ×1.5)
+- Extension 3: Bi-gram + sentiment weighting
+
+**Results:**
+
+| Feature set | Vocabulary size | CV F1 | Test F1 |
+|------------|-----------------|-------|---------|
 | Uni-gram TF-IDF | 90 | 0.9600 | 1.0000 |
 | **Bi-gram TF-IDF** | **214** | **1.0000** | **1.0000** |
 | Uni-gram + Sentiment | 90 | 0.9600 | 1.0000 |
 | Bi-gram + Sentiment | 214 | 1.0000 | 1.0000 |
 
-**分析**（在净化标点 token 后复现）：
-- **情感加权不再带来提升**：Uni-gram 叠加情感词典加权后 CV F1 维持 0.9600 不变——该数据集中正负样本词汇本身区分度已足够，情感先验无额外增益
-- **Bi-gram 表现反超**：净化标点后的 Bi-gram 词表 214 维，CV F1 达到 1.0000，高于 Uni-gram 的 0.9600，说明词序信息（如"千万别买"）确有增益，且未再出现维度灾难
-- **最佳组合**：Bi-gram TF-IDF（CV F1=1.0000）；情感加权在本数据上无额外收益
+**Analysis** (reproduced after removing punctuation tokens):
 
-### 5.4 任务四：LSTM 过拟合修复 + 与 SVM PK
+- **Sentiment weighting no longer adds anything**: stacking the sentiment lexicon onto Uni-gram
+  leaves CV F1 at 0.9600 — in this corpus the positive and negative vocabularies are already
+  separable, so the sentiment prior contributes no extra signal.
+- **Bi-gram overtakes Uni-gram**: after punctuation is cleaned out, the Bi-gram vocabulary has 214
+  dimensions and reaches CV F1 = 1.0000 against Uni-gram's 0.9600, showing that word-order
+  information (e.g. 千万别买, "whatever you do, don't buy") does help — and the earlier curse of
+  dimensionality no longer appears.
+- **Best configuration**: Bi-gram TF-IDF (CV F1 = 1.0000); sentiment weighting brings no extra
+  benefit on this data.
 
-**修复措施**：
+### 5.4 Task 4: Fixing LSTM overfitting, then LSTM vs SVM
 
-| 技术 | 实现方式 | 作用 |
-|------|---------|------|
-| EarlyStopping | patience=5, min_delta=0.001 | 监控验证损失，不提升则提前停止 |
-| Dropout | 0.5（Embedding + LSTM + FC） | 随机失活防止共适应 |
-| 梯度裁剪 | max_norm=1.0 | 限制梯度范数，防止梯度爆炸 |
-| 权重衰减 | Adam weight_decay=1e-3 | L2 正则化约束权重 |
-| 学习率衰减 | ReduceLROnPlateau | 验证损失不下降时自动降低学习率 |
+**Regularisation measures:**
 
-**对比结果**：
+| Technique | Implementation | Effect |
+|------|---------------|--------|
+| Early stopping | patience=5, min_delta=0.001 | Monitors validation loss and stops when it stops improving |
+| Dropout | 0.5 (Embedding + LSTM + FC) | Random deactivation prevents co-adaptation |
+| Gradient clipping | max_norm=1.0 | Caps gradient norm to prevent explosion |
+| Weight decay | Adam weight_decay=1e-3 | L2 constraint on weights |
+| LR scheduling | ReduceLROnPlateau | Lowers the learning rate when validation loss stalls |
 
-| 指标 | BiLSTM(Fixed) | LinearSVM |
-|------|--------------|-----------|
+**Head-to-head result:**
+
+| Metric | BiLSTM (Fixed) | LinearSVM |
+|------|---------------|-----------|
 | Precision | 0.7500 | **1.0000** |
 | Recall | 1.0000 | **1.0000** |
-| **F1-Score** | **0.8571** | **1.0000** |
+| **F1-score** | **0.8571** | **1.0000** |
 | AUC | 0.8889 | - |
-| 参数量 | 12,769 | ~100 |
-| 训练时间 | ~2s | ~0.01s |
+| Parameters | 12,769 | ~100 |
+| Training time | ~2 s | ~0.01 s |
 
-**结论**：SVM 完胜。1.2 万参数的 LSTM 在 30 条样本上仍难与线性模型匹敌，简单线性模型在小数据场景下更优。
+**Conclusion**: SVM wins outright. A 12K-parameter LSTM still cannot match a linear model on 30
+samples — simple linear models are the better choice in small-data settings.
 
 ---
 
-## 六、Phase 4: 全面模型对比
+## 6. Phase 4: Full model comparison
 
-### 6.1 任务一：树模型 vs 线性模型
+### 6.1 Task 1: Tree models vs linear models
 
-**实验设置**：使用特征工程实验中的情感加权特征（Uni-gram TF-IDF + 情感词典×1.5）
+**Setup**: uses the sentiment-weighted features from 5.3 (Uni-gram TF-IDF + sentiment lexicon ×1.5).
 
-| 模型 | 类型 | Precision | Recall | F1 | AUC |
+| Model | Type | Precision | Recall | F1 | AUC |
 |------|------|-----------|--------|-----|-----|
-| **LogisticRegression** | 线性 | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
-| **LinearSVM** | 线性 | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
-| **RandomForest** | 树模型 | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
-| XGBoost | 树模型 | 0.5000 | 1.0000 | 0.6667 | 0.6667 |
+| **LogisticRegression** | Linear | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| **LinearSVM** | Linear | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| **RandomForest** | Tree | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| XGBoost | Tree | 0.5000 | 1.0000 | 0.6667 | 0.6667 |
 
-**分析**：
-- **RF 通过 bagging 避免过拟合**：多棵决策树的投票机制降低方差
-- **XGBoost 的 boosting 机制失效**：梯度提升 sequential 地拟合残差，小数据下对噪声敏感，第 3 棵树就开始过拟合
-- **线性模型依然稳健**：L2 正则 + 简单结构 = 小数据最优解
+**Analysis:**
 
-### 6.2 任务二：深度学习模型对比
+- **RandomForest avoids overfitting through bagging**: voting across many decision trees reduces variance.
+- **XGBoost's boosting breaks down**: gradient boosting fits residuals sequentially and is sensitive
+  to noise on small data — it starts overfitting by its third tree.
+- **Linear models remain robust**: L2 regularisation plus a simple structure is the optimal solution
+  for small datasets.
 
-| 模型 | 结构特点 | Precision | Recall | F1 | AUC |
-|------|---------|-----------|--------|-----|-----|
-| **TextCNN** | 多尺度卷积(2,3,4) | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
-| **BiLSTM+Attention** | 双向LSTM+注意力 | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
-| **BiLSTM(Fixed)** | 双向LSTM+池化 | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+### 6.2 Task 2: Deep-learning model comparison
 
-**分析**：
-- **TextCNN 的多尺度卷积适合短文本**：2-gram/3-gram/4-gram 卷积核能捕获局部情感模式
-- **BiLSTM+Attention 的注意力机制增强可解释性**：可可视化每个词对分类的贡献权重
-- **BiLSTM(Fixed) 同样达完美分类**：固定 PyTorch 随机种子（manual_seed(42)）后，三个深度模型在 6 条测试样本上均取得全指标 1.0000，说明短文本分类任务对模型结构不敏感
+| Model | Structural notes | Precision | Recall | F1 | AUC |
+|------|-----------------|-----------|--------|-----|-----|
+| **TextCNN** | Multi-scale convolution (2, 3, 4) | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| **BiLSTM+Attention** | BiLSTM + attention | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+| **BiLSTM(Fixed)** | BiLSTM + pooling | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
 
-### 6.3 任务三：全部模型汇总表
+**Analysis:**
 
-| 模型 | 类型 | 参数量 | Precision | Recall | F1 | AUC | 混淆矩阵 |
-|------|------|--------|-----------|--------|-----|-----|---------|
-| LogisticRegression | 线性 | ~100 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
-| LinearSVM | 线性 | ~100 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
-| RandomForest | 树模型 | ~500 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
-| XGBoost | 树模型 | ~300 | 0.5000 | 1.0000 | 0.6667 | 0.6667 | TN=0 FP=3 / FN=0 TP=3 |
-| TextCNN | 深度学习 | ~15K | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
-| BiLSTM+Attention | 深度学习 | ~18K | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
-| BiLSTM(Fixed) | 深度学习 | ~13K | 1.0000 | 0.6667 | 0.8000 | 0.7778 | TN=3 FP=0 / FN=1 TP=2 |
+- **TextCNN's multi-scale convolution suits short text**: 2-gram / 3-gram / 4-gram kernels capture
+  local sentiment patterns.
+- **BiLSTM+Attention improves interpretability**: per-word contribution weights can be visualised.
+- **BiLSTM(Fixed) also classifies perfectly**: after fixing the PyTorch seed (`manual_seed(42)`),
+  all three deep models score 1.0000 across every metric on the 6 test samples — short-text
+  classification is simply not sensitive to architecture here.
 
----
+### 6.3 Task 3: All-model summary
 
-## 七、传统线性模型 vs 深度学习模型深度对比
-
-### 7.1 传统线性模型（LR / SVM）
-
-**核心优势**：
-- ✅ **训练速度极快**：毫秒级，适合实时推理
-- ✅ **参数量极少**：~100 个参数，内存占用低
-- ✅ **可解释性强**：可直接输出特征权重，便于业务理解
-- ✅ **小数据稳定性**：不易过拟合，泛化误差可控
-- ✅ **对稀疏特征友好**：TF-IDF 等高维稀疏输入天然适配
-
-**核心劣势**：
-- ❌ **无法建模非线性**：决策边界只能是超平面
-- ❌ **忽略序列信息**：词袋假设，丢失词序和上下文
-- ❌ **特征工程依赖**：需要人工设计有效特征
-
-**适用场景**：
-- 数据量 < 1,000 条
-- 实时在线服务（QPS > 1000）
-- 需要模型可解释性（金融、医疗风控）
-- 资源受限环境（移动端、嵌入式设备）
-
-### 7.2 深度学习模型（CNN / RNN / Attention）
-
-**核心优势**：
-- ✅ **自动特征学习**：Embedding 层自动学习语义表示
-- ✅ **捕获局部模式**：CNN 的 n-gram 卷积适合短语情感
-- ✅ **建模序列依赖**：LSTM 能处理长距离上下文
-- ✅ **Attention 可解释性**：权重可视化展示模型关注点
-- ✅ **大数据上限高**：BERT 等预训练模型在百万级数据上 SOTA
-
-**核心劣势**：
-- ❌ **参数量巨大**：10K-100M 参数，小数据严重过拟合
-- ❌ **训练成本高**：需要 GPU，训练时间分钟到小时级
-- ❌ **超参敏感**：学习率、层数、隐藏维度需精细调优
-- ❌ **黑盒特性**：深层网络决策过程难以解释
-
-**适用场景**：
-- 数据量 > 10,000 条
-- 需要理解复杂语义（讽刺、隐喻）
-- 有充足 GPU 资源
-- 离线批处理任务（对延迟不敏感）
-
-### 7.3 树模型（RF / XGBoost）
-
-**核心优势**：
-- ✅ **自动特征交互**：能捕获非线性特征组合
-- ✅ **特征重要性输出**：便于特征筛选和业务理解
-- ✅ **对缺失值鲁棒**：不需要填充缺失值
-- ✅ **RF 抗过拟合**：bagging 降低方差
-
-**核心劣势**：
-- ❌ **无法处理文本序列**：需要预先向量化
-- ❌ **XGBoost 小数据敏感**：boosting 容易过拟合
-- ❌ **高维稀疏特征效果差**：不如线性模型
-
-**适用场景**：
-- 数据量 1,000-100,000 条
-- 表格数据（结构化特征）
-- 需要特征重要性分析
+| Model | Type | Parameters | Precision | Recall | F1 | AUC | Confusion matrix |
+|------|------|-----------|-----------|--------|-----|-----|------------------|
+| LogisticRegression | Linear | ~100 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
+| LinearSVM | Linear | ~100 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
+| RandomForest | Tree | ~500 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
+| XGBoost | Tree | ~300 | 0.5000 | 1.0000 | 0.6667 | 0.6667 | TN=0 FP=3 / FN=0 TP=3 |
+| TextCNN | Deep learning | ~15K | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
+| BiLSTM+Attention | Deep learning | ~18K | 1.0000 | 1.0000 | 1.0000 | 1.0000 | TN=3 FP=0 / FN=0 TP=3 |
+| BiLSTM(Fixed) | Deep learning | ~13K | 1.0000 | 0.6667 | 0.8000 | 0.7778 | TN=3 FP=0 / FN=1 TP=2 |
 
 ---
 
-## 八、核心结论与洞察
+## 7. Classical linear models vs deep learning, in depth
 
-### 8.1 数据规模决定模型选择
+### 7.1 Classical linear models (LR / SVM)
 
-| 数据规模 | 推荐模型 | 原因 |
-|---------|---------|------|
-| < 1,000 | LR / SVM + 特征工程 | 简单模型避免过拟合 |
-| 1,000-10,000 | RF / TextCNN | 树模型抗过拟合，CNN 捕获局部模式 |
-| 10,000-100,000 | BiLSTM+Attn / XGBoost | 足够数据训练复杂模型 |
-| > 100,000 | BERT / Transformer | 预训练 + 微调达到 SOTA |
+**Strengths:**
 
-### 8.2 特征工程 > 模型复杂度
+- ✅ **Very fast to train**: milliseconds, suitable for real-time inference
+- ✅ **Tiny parameter count**: ~100 parameters, low memory footprint
+- ✅ **Highly interpretable**: feature weights can be read directly and explained to the business
+- ✅ **Stable on small data**: resists overfitting, with controllable generalisation error
+- ✅ **Friendly to sparse features**: a natural fit for high-dimensional TF-IDF input
 
-- **特征净化与词序信息同样重要**：剔除标点 token 后 Bi-gram CV F1 达 1.0000，超过 Uni-gram（0.9600），词序信息（如"千万别买"）带来增益
-- **Bi-gram 在本数据上不再失效**：净化后的 Bi-gram 词表 214 维、CV F1=1.0000，未再出现维度灾难；情感加权（×1.5）在本数据上无额外增益
-- **手写 TF-IDF 与 sklearn 效果一致**：验证了我们实现的正确性
+**Weaknesses:**
 
-### 8.3 正则化策略的关键作用
+- ❌ **Cannot model non-linearity**: the decision boundary is a hyperplane
+- ❌ **Ignores sequence information**: the bag-of-words assumption loses word order and context
+- ❌ **Depends on feature engineering**: effective features must be designed by hand
 
-- **ElasticNet ≈ L2 > L1（小数据）**：ElasticNet 与 L2 的平滑约束优于 L1 硬截断（LR-L1 的 CV F1 仅 0.4000）
-- **EarlyStopping 显著节省训练时间**：第 11 轮触发 vs 100 轮全量训练
-- **Dropout 0.5 是 sweet spot**：过低无法防止过拟合，过高导致欠拟合
+**Where they fit:**
 
-### 8.4 模型 ensemble 的潜力
+- Fewer than 1,000 samples
+- Real-time online services (QPS > 1000)
+- Situations requiring interpretability (finance, medical risk control)
+- Resource-constrained environments (mobile, embedded devices)
 
-- **RF 的 bagging 在小数据上有效**：5 棵树投票 vs 单棵决策树
-- **但 XGBoost 的 boosting 失效**：sequential 拟合残差放大噪声
-- **未来可尝试 Stacking**：LR + SVM + RF 的加权组合
+### 7.2 Deep-learning models (CNN / RNN / Attention)
+
+**Strengths:**
+
+- ✅ **Learns features automatically**: the embedding layer picks up semantic representations
+- ✅ **Captures local patterns**: CNN's n-gram convolutions suit phrase-level sentiment
+- ✅ **Models sequential dependencies**: LSTM handles long-range context
+- ✅ **Attention is interpretable**: weight visualisation shows where the model is looking
+- ✅ **High ceiling on large data**: pretrained models such as BERT reach SOTA at the million-sample scale
+
+**Weaknesses:**
+
+- ❌ **Enormous parameter counts**: 10K–100M parameters overfit badly on small data
+- ❌ **Expensive to train**: needs a GPU; training runs from minutes to hours
+- ❌ **Sensitive to hyper-parameters**: learning rate, depth and hidden size all need careful tuning
+- ❌ **Black-box behaviour**: the decision process of a deep network is hard to explain
+
+**Where they fit:**
+
+- More than 10,000 samples
+- Tasks needing complex semantics (sarcasm, metaphor)
+- Ample GPU resources
+- Offline batch processing, where latency does not matter
+
+### 7.3 Tree models (RF / XGBoost)
+
+**Strengths:**
+
+- ✅ **Automatic feature interactions**: captures non-linear feature combinations
+- ✅ **Feature-importance output**: useful for feature selection and business understanding
+- ✅ **Robust to missing values**: no imputation required
+- ✅ **RandomForest resists overfitting**: bagging reduces variance
+
+**Weaknesses:**
+
+- ❌ **Cannot handle text sequences directly**: needs pre-vectorised input
+- ❌ **XGBoost is sensitive on small data**: boosting overfits easily
+- ❌ **Weak on high-dimensional sparse features**: inferior to linear models here
+
+**Where they fit:**
+
+- 1,000–100,000 samples
+- Tabular data (structured features)
+- Analyses that need feature importance
 
 ---
 
-## 九、后续优化方向
+## 8. Core conclusions and insights
 
-### 9.1 数据层面
-- **扩充真实业务语料**：至少 10,000+ 条，覆盖更多领域和表达方式
-- **数据增强**：同义词替换、回译、EDA（Easy Data Augmentation）
-- **引入不平衡处理**：实际业务中正负样本可能不均衡
+### 8.1 Data scale determines model choice
 
-### 9.2 特征层面
-- **预训练词向量**：Word2Vec / GloVe / FastText 替代随机 Embedding
-- **BERT 嵌入**：使用 bert-base-chinese 提取上下文感知特征
-- **字符级特征**：CNN-char 捕获字形信息（对中文错别字鲁棒）
+| Data scale | Recommended model | Reason |
+|-----------|------------------|--------|
+| < 1,000 | LR / SVM + feature engineering | Simple models avoid overfitting |
+| 1,000–10,000 | RF / TextCNN | Trees resist overfitting; CNN captures local patterns |
+| 10,000–100,000 | BiLSTM+Attn / XGBoost | Enough data to train complex models |
+| > 100,000 | BERT / Transformer | Pretraining + fine-tuning reaches SOTA |
 
-### 9.3 模型层面
-- **预训练语言模型**：BERT / RoBERTa / MacBERT 微调
-- **模型压缩**：量化（INT8）、蒸馏（TinyBERT）、剪枝
-- **多任务学习**：联合训练情感分析 + 主题分类
+### 8.2 Feature engineering outweighs model complexity
 
-### 9.4 工程层面
-- **模型服务化**：Flask / FastAPI 封装，RESTful API 部署
-- **监控与迭代**：日志记录预测分布，定期重训练
-- **A/B 测试**：线上对比不同模型效果
+- **Feature cleaning matters as much as word order**: after punctuation tokens are removed, Bi-gram
+  reaches CV F1 = 1.0000, ahead of Uni-gram's 0.9600 — word-order information (e.g. 千万别买) adds
+  real signal.
+- **Bi-gram no longer fails on this data**: the cleaned Bi-gram vocabulary has 214 dimensions and
+  CV F1 = 1.0000, with no repeat of the earlier dimensionality problem; sentiment weighting (×1.5)
+  provides no additional gain here.
+- **The hand-written TF-IDF matches sklearn**: which validates the correctness of the implementation.
 
----
+### 8.3 Regularisation strategy matters
 
-## 十、实验代码索引
+- **ElasticNet ≈ L2 > L1 (on small data)**: ElasticNet's and L2's smooth constraints beat L1's hard
+  thresholding (LR-L1 reaches only CV F1 = 0.4000).
+- **Early stopping saves substantial training time**: triggered at epoch 11 versus 100 full epochs.
+- **Dropout 0.5 is the sweet spot**: lower does not prevent overfitting; higher causes underfitting.
 
-| 阶段 | 文件路径 | 说明 |
-|------|---------|------|
-| Phase 1 | `task1/ms_nlp_pipeline.py` | 基础文本清洗 + TF-IDF + BiLSTM |
-| Phase 1 修复 | `task1/lstm_fixed.py` | EarlyStopping + Dropout + 梯度裁剪 |
-| Phase 2 | `task2/grid_search.py` | LR/SVM 网格搜索 + 5折CV |
-| Phase 2 | `task2/data_generator.py` | 数据生成脚本 |
-| Phase 3 任务一 | `task3/ablation_study.py` | L1/L2/ElasticNet 消融实验 |
-| Phase 3 任务二 | `task3/heatmap_visualization.py` | 网格搜索热力图 |
-| Phase 3 任务三 | `task3/ngram_sentiment_features.py` | N-gram + 情感加权 |
-| Phase 4 任务一 | `task4/tree_models_comparison.py` | RF/XGBoost vs LR/SVM |
-| Phase 4 任务二 | `task4/deep_models_comparison.py` | TextCNN/BiLSTM+Attn vs SVM |
-| Phase 4 任务三 | `task4/final_summary.py` | 全部模型汇总 + 混淆矩阵 |
-| 实验报告 | `EXPERIMENT_REPORT.md` | 本报告 |
+### 8.4 The potential of model ensembling
+
+- **RandomForest's bagging works on small data**: 5 trees voting versus a single decision tree.
+- **But XGBoost's boosting fails**: sequentially fitting residuals amplifies noise.
+- **Stacking is a natural next step**: a weighted combination of LR + SVM + RF.
 
 ---
 
-*报告生成时间：2026年8月*
-*实验环境：MacBook Air M5, Python 3.9, PyTorch 2.8, scikit-learn 1.6*
+## 9. Future work
+
+### 9.1 Data
+
+- **Expand to a real business corpus**: at least 10,000+ samples, covering more domains and phrasings
+- **Data augmentation**: synonym replacement, back-translation, EDA (Easy Data Augmentation)
+- **Handle class imbalance**: real-world positive/negative distributions are rarely balanced
+
+### 9.2 Features
+
+- **Pretrained word vectors**: Word2Vec / GloVe / FastText instead of random embeddings
+- **BERT embeddings**: use `bert-base-chinese` for context-aware features
+- **Character-level features**: CNN-char captures character shapes (robust to Chinese typos)
+
+### 9.3 Models
+
+- **Pretrained language models**: fine-tune BERT / RoBERTa / MacBERT
+- **Model compression**: quantisation (INT8), distillation (TinyBERT), pruning
+- **Multi-task learning**: train sentiment analysis and topic classification jointly
+
+### 9.4 Engineering
+
+- **Model serving**: wrap in Flask / FastAPI and deploy behind a RESTful API
+- **Monitoring and iteration**: log prediction distributions and retrain periodically
+- **A/B testing**: compare model variants in production
+
+---
+
+## 10. Code index
+
+| Stage | File | Description |
+|------|------|-------------|
+| Phase 1 | `phase1/ms_nlp_pipeline.py` | Base text cleaning + TF-IDF + BiLSTM |
+| Phase 1 (fixed) | `phase1/lstm_fixed.py` | Early stopping + dropout + gradient clipping |
+| Phase 2 | `phase2/grid_search.py` | LR/SVM grid search + 5-fold CV |
+| Phase 2 | `phase2/data_generator.py` | Corpus generator |
+| Phase 3, Task 1 | `phase3/ablation_study.py` | L1/L2/ElasticNet ablation |
+| Phase 3, Task 2 | `phase3/heatmap_visualization.py` | Grid-search heat maps |
+| Phase 3, Task 3 | `phase3/ngram_sentiment_features.py` | N-gram + sentiment weighting |
+| Phase 4, Task 1 | `phase4/tree_models_comparison.py` | RF/XGBoost vs LR/SVM |
+| Phase 4, Task 2 | `phase4/deep_models_comparison.py` | TextCNN / BiLSTM+Attn vs SVM |
+| Phase 4, Task 3 | `phase4/final_summary.py` | All-model summary + confusion matrices |
+| Report | `EXPERIMENT_REPORT.md` | This report |
+
+---
+
+*Report written: August 2026*
+*Experiment environment: MacBook Air M5, Python 3.9, PyTorch 2.8, scikit-learn 1.6*

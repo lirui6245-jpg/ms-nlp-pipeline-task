@@ -15,7 +15,7 @@ from sklearn.metrics import classification_report, f1_score
 import numpy as np
 
 # =====================================================================
-# 0. 数据
+# 0. Data
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -51,7 +51,7 @@ RAW_CORPUS = [
 ]
 
 # =====================================================================
-# 1. 文本清洗管道
+# 1. Text cleaning pipeline
 # =====================================================================
 class TextPreprocessor:
     def __init__(self, stop_words: List[str] = None):
@@ -70,7 +70,7 @@ class TextPreprocessor:
 
 
 # =====================================================================
-# 2. 手写 TF-IDF 支持 N-gram
+# 2. Hand-written TF-IDF with N-gram support
 # =====================================================================
 class CustomTfidfVectorizerNGram:
     def __init__(self, max_features: int = 1000, ngram_range: Tuple[int, int] = (1, 1)):
@@ -80,7 +80,7 @@ class CustomTfidfVectorizerNGram:
         self.idf_: Dict[str, float] = {}
 
     def _get_ngrams(self, tokens: List[str]) -> List[str]:
-        """生成 n-gram 特征"""
+        """Generate n-gram features"""
         ngrams = []
         for n in range(self.ngram_range[0], self.ngram_range[1] + 1):
             for i in range(len(tokens) - n + 1):
@@ -125,28 +125,28 @@ class CustomTfidfVectorizerNGram:
 
 
 # =====================================================================
-# 3. 情感加权模块
+# 3. Sentiment weighting module
 # =====================================================================
 class SentimentWeighter:
-    """基于简单情感词典的 TF-IDF 加权"""
+    """TF-IDF weighting based on a simple sentiment lexicon"""
     def __init__(self):
-        # 正面情感词
+        # Positive sentiment words
         self.positive_words = {
             '优秀', '完美', '给力', '精致', '顺畅', '专业', '贴心', '一流', 
             '令人满意', '好评', '喜欢', '值得信赖', '回购', '舒适', '丰富'
         }
-        # 负面情感词
+        # Negative sentiment words
         self.negative_words = {
             '极差', '劣质', '差劲', '失望', '恶劣', '堪忧', '破损', '崩溃',
             '后悔', '恼火', '烦躁', '无语', '烂透', '坑人', '假货', '差评'
         }
-        self.sentiment_boost = 1.5  # 情感词加权系数
+        self.sentiment_boost = 1.5  # Sentiment word weighting coefficient
 
     def apply_weight(self, tfidf_vec: Dict[str, float]) -> Dict[str, float]:
-        """对 TF-IDF 向量应用情感加权"""
+        """Apply sentiment weighting to the TF-IDF vector"""
         weighted = {}
         for word, score in tfidf_vec.items():
-            # 检查 unigram（去掉 n-gram 的下划线）
+            # Check unigrams (strip the underscore of the n-gram)
             unigrams = word.split('_')
             sentiment_factor = 1.0
             
@@ -163,14 +163,14 @@ class SentimentWeighter:
 
 
 # =====================================================================
-# 4. 主流程
+# 4. Main pipeline
 # =====================================================================
 def main():
     print("=" * 70)
     print(" 🧪 N-gram + Sentiment Weighting Feature Experiment")
     print("=" * 70)
 
-    # 4.1 数据预处理
+    # 4.1 Data preprocessing
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
     tokenized_docs = []
     labels = []
@@ -181,7 +181,7 @@ def main():
         tokenized_docs.append(tokens)
         labels.append(label)
 
-    # 4.2 对比实验设置
+    # 4.2 Comparison experiment setup
     experiments = [
         {"name": "Uni-gram TF-IDF", "ngram": (1, 1), "sentiment": False},
         {"name": "Bi-gram TF-IDF", "ngram": (1, 2), "sentiment": False},
@@ -194,21 +194,21 @@ def main():
 
     for exp in experiments:
         print(f"\n{'='*70}")
-        print(f" 🔍 实验: {exp['name']}")
+        print(f" 🔍 Experiment: {exp['name']}")
         print(f"{'='*70}")
 
-        # 特征提取
+        # Feature extraction
         vectorizer = CustomTfidfVectorizerNGram(max_features=500, ngram_range=exp['ngram'])
         tfidf_matrix = vectorizer.fit_transform(tokenized_docs)
-        print(f" -> 词表大小: {len(vectorizer.vocab)}")
+        print(f" -> Vocabulary size: {len(vectorizer.vocab)}")
 
-        # 情感加权
+        # Sentiment weighting
         if exp['sentiment']:
             weighter = SentimentWeighter()
             tfidf_matrix = [weighter.apply_weight(vec) for vec in tfidf_matrix]
-            print(f" -> 已应用情感加权 (boost={weighter.sentiment_boost})")
+            print(f" -> Sentiment weighting applied (boost={weighter.sentiment_boost})")
 
-        # 转换为 numpy
+        # Convert to numpy
         vocab_list = list(vectorizer.vocab.keys())
         n_samples = len(tfidf_matrix)
         n_features = len(vocab_list)
@@ -220,16 +220,16 @@ def main():
                     X[i, j] = value
         y = np.array(labels)
 
-        # 划分数据
+        # Split the data
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
         )
 
-        # 训练最优模型 (LinearSVM with L2)
+        # Train the best model (LinearSVM with L2)
         svm = LinearSVC(C=10, penalty='l2', loss='hinge', max_iter=5000, random_state=42)
         svm.fit(X_train, y_train)
         
-        # 交叉验证
+        # Cross validation
         svm_cv = GridSearchCV(
             LinearSVC(random_state=42, max_iter=5000),
             {'C': [10], 'penalty': ['l2'], 'loss': ['hinge'], 'dual': [True]},
@@ -241,7 +241,7 @@ def main():
         test_f1 = f1_score(y_test, y_pred)
         
         print(f"✅ CV F1: {svm_cv.best_score_:.4f}")
-        print(f"✅ 测试集 F1: {test_f1:.4f}")
+        print(f"✅ Test F1: {test_f1:.4f}")
         
         results.append({
             'name': exp['name'],
@@ -250,23 +250,23 @@ def main():
             'test_f1': test_f1
         })
 
-    # 4.3 结果对比
+    # 4.3 Result comparison
     print("\n" + "=" * 70)
-    print(" 🏆 特征工程实验结果对比")
+    print(" 🏆 Feature engineering experiment comparison")
     print("=" * 70)
-    print(f"{'特征方案':<25} {'词表大小':<12} {'CV F1':<12} {'测试集 F1':<12}")
+    print(f"{'Feature Scheme':<25} {'Vocab Size':<12} {'CV F1':<12} {'Test F1':<12}")
     print("-" * 65)
     for r in results:
         print(f"{r['name']:<25} {r['vocab_size']:<12} {r['cv_f1']:<12.4f} {r['test_f1']:<12.4f}")
 
-    # 4.4 分析
-    print("\n💡 分析:")
-    print("1. Bi-gram 引入词序信息，可能捕获更多语义")
-    print("2. 情感加权强化情感词特征，提升区分度")
-    print("3. 小数据集下特征扩充效果有限，需更大语料验证")
+    # 4.4 Analysis
+    print("\n💡 Analysis:")
+    print("1. Bi-gram introduces word-order information, potentially capturing more semantics")
+    print("2. Sentiment weighting strengthens sentiment-word features, improving discriminability")
+    print("3. With a small dataset, feature expansion has limited effect; a larger corpus is needed")
 
     print("\n" + "=" * 70)
-    print(" 🎉 实验完成！")
+    print(" 🎉 Experiment complete!")
     print("=" * 70)
 
 

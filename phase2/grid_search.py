@@ -5,7 +5,7 @@ from typing import List, Dict
 import zhconv
 import jieba
 
-# 从 sklearn 导入需要的工具
+# Import the needed utilities from sklearn
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
@@ -16,8 +16,8 @@ from sklearn.exceptions import ConvergenceWarning
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 # =====================================================================
-# 0. 模拟企业级业务语料库 (1=正向评价/好评, 0=负向评价/差评)
-# 扩充至30条样本，确保支持5折分层交叉验证
+# 0. Simulated enterprise-grade business corpus (1=positive review, 0=negative review)
+# Expanded to 30 samples to support 5-fold stratified cross validation
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -53,36 +53,36 @@ RAW_CORPUS = [
 ]
 
 # =====================================================================
-# 1. 文本清洗管道 (承接第一阶段实现)
+# 1. Text cleaning pipeline (carried over from Phase 1)
 # =====================================================================
 class TextPreprocessor:
-    """工业级文本预处理器：处理繁简转换、噪声过滤、分词"""
+    """Industrial-grade text preprocessor: handles Traditional/Simplified conversion, noise filtering and tokenization"""
     def __init__(self, stop_words: List[str] = None):
         self.stop_words = set(stop_words) if stop_words else set()
 
     def clean_text(self, text: str) -> str:
-        # 移除 HTML 标签与 URL
+        # Remove HTML tags and URLs
         text = re.sub(r'<.*?>|http\S+|www\S+', '', text)
-        # 繁体转简体
+        # Traditional to Simplified Chinese
         text = zhconv.convert(text, 'zh-cn')
-        # 正则过滤：保留中英文、数字、中英文基础标点
+        # Regex filter: keep Chinese/English letters, digits and basic punctuation
         text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？、；：]', '', text)
-        # 压缩多余空格
+        # Collapse extra whitespace
         return re.sub(r'\s+', ' ', text).strip()
 
     def tokenize(self, text: str) -> List[str]:
-        """结巴分词并剔除停用词与标点"""
+        """Jieba tokenization with stopword and punctuation removal"""
         tokens = jieba.cut(text)
         return [t for t in tokens if t.strip() and t not in self.stop_words
                 and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 
 # =====================================================================
-# 2. 手写 TF-IDF 特征提取器 (承接第一阶段实现)
+# 2. Hand-written TF-IDF feature extractor (carried over from Phase 1)
 # =====================================================================
 class CustomTfidfVectorizer:
     """
-    手写实现 TF-IDF 算法，严格遵循 sklearn 平滑逆文档频率公式：
+    Hand-written TF-IDF implementation, strictly following sklearn's smoothed IDF formula:
     idf(t) = log((1 + n_samples) / (1 + df(t))) + 1
     """
     def __init__(self, max_features: int = 1000):
@@ -124,14 +124,14 @@ class CustomTfidfVectorizer:
 
 
 # =====================================================================
-# 3. 第二阶段：基于手写TF-IDF特征的超参网格搜索与交叉验证
+# 3. Phase 2: hyperparameter grid search and cross validation on hand-written TF-IDF features
 # =====================================================================
 def main():
     print("=" * 70)
     print(" 💼 Microsoft Internship: Phase 2 - Grid Search + Cross Validation")
     print("=" * 70)
 
-    # 3.1 数据预处理
+    # 3.1 Data preprocessing
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
     tokenized_docs = []
     labels = []
@@ -142,16 +142,16 @@ def main():
         tokenized_docs.append(tokens)
         labels.append(label)
 
-    # 3.2 手写 TF-IDF 特征提取
-    print("\n--- [Step 1: 手写 TF-IDF 特征提取] ---")
+    # 3.2 Hand-written TF-IDF feature extraction
+    print("\n--- [Step 1: Hand-written TF-IDF feature extraction] ---")
     tfidf_vectorizer = CustomTfidfVectorizer(max_features=500)
     tfidf_matrix = tfidf_vectorizer.fit_transform(tokenized_docs)
-    print(f" -> 词表大小: {len(tfidf_vectorizer.vocab)}")
-    print(f" -> 样本数: {len(tfidf_matrix)}")
+    print(f" -> Vocabulary size: {len(tfidf_vectorizer.vocab)}")
+    print(f" -> Number of samples: {len(tfidf_matrix)}")
 
-    # 3.3 将字典格式的 TF-IDF 转换为 numpy 稠密矩阵
-    # 注：sklearn 的模型需要矩阵输入，因此需将稀疏字典表示转为标准矩阵
-    print("\n--- [Step 2: 特征矩阵格式转换] ---")
+    # 3.3 Convert dictionary-format TF-IDF into a dense numpy matrix
+    # Note: sklearn models need matrix input, so the sparse dict representation is converted to a standard matrix
+    print("\n--- [Step 2: Feature matrix format conversion] ---")
     vocab_list = list(tfidf_vectorizer.vocab.keys())
     n_samples = len(tfidf_matrix)
     n_features = len(vocab_list)
@@ -164,28 +164,28 @@ def main():
                 X[i, j] = value
 
     y = np.array(labels)
-    print(f" -> 特征矩阵形状: {X.shape}")
-    print(f" -> 标签分布: {dict(zip(*np.unique(y, return_counts=True)))}")
+    print(f" -> Feature matrix shape: {X.shape}")
+    print(f" -> Label distribution: {dict(zip(*np.unique(y, return_counts=True)))}")
 
-    # 3.4 划分训练集和测试集（分层抽样，保持正负样本比例一致）
-    print("\n--- [Step 3: 分层划分训练集/测试集 (8:2)] ---")
+    # 3.4 Split train/test sets (stratified sampling to keep the class ratio consistent)
+    print("\n--- [Step 3: Stratified train/test split (8:2)] ---")
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
         test_size=0.2,
         random_state=42,
         stratify=y
     )
-    print(f" -> 训练集大小: {len(X_train)} (正类: {sum(y_train==1)}, 负类: {sum(y_train==0)})")
-    print(f" -> 测试集大小: {len(X_test)} (正类: {sum(y_test==1)}, 负类: {sum(y_test==0)})")
+    print(f" -> Train set size: {len(X_train)} (positive: {sum(y_train==1)}, negative: {sum(y_train==0)})")
+    print(f" -> Test set size: {len(X_test)} (positive: {sum(y_test==1)}, negative: {sum(y_test==0)})")
 
-    # 3.5 定义 5 折分层交叉验证策略
-    print("\n--- [Step 4: 设置 5 折分层交叉验证] ---")
+    # 3.5 Define the 5-fold stratified cross-validation strategy
+    print("\n--- [Step 4: Set up 5-fold stratified cross validation] ---")
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    print(f" -> 交叉验证折数: 5")
+    print(f" -> Cross-validation folds: 5")
 
-    # 3.6 Logistic Regression 网格搜索
+    # 3.6 Logistic Regression grid search
     print("\n" + "=" * 70)
-    print(" 🔍 开始网格搜索: Logistic Regression")
+    print(" 🔍 Starting grid search: Logistic Regression")
     print("=" * 70)
 
     lr_params = {
@@ -205,16 +205,16 @@ def main():
     )
 
     lr_grid.fit(X_train, y_train)
-    print(f"\n✅ 最优参数: {lr_grid.best_params_}")
-    print(f"✅ 最优 CV F1 分数: {lr_grid.best_score_:.4f}")
+    print(f"\n✅ Best parameters: {lr_grid.best_params_}")
+    print(f"✅ Best CV F1 score: {lr_grid.best_score_:.4f}")
 
     y_pred_lr = lr_grid.best_estimator_.predict(X_test)
-    print(f"\n📊 Logistic Regression 测试集报告:")
+    print(f"\n📊 Logistic Regression test set report:")
     print(classification_report(y_test, y_pred_lr, digits=4))
 
-    # 3.7 Linear SVM 网格搜索
+    # 3.7 Linear SVM grid search
     print("\n" + "=" * 70)
-    print(" 🔍 开始网格搜索: Linear SVM")
+    print(" 🔍 Starting grid search: Linear SVM")
     print("=" * 70)
 
     svm_params = [
@@ -234,24 +234,24 @@ def main():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ConvergenceWarning)
         svm_grid.fit(X_train, y_train)
-    print(f"\n✅ 最优参数: {svm_grid.best_params_}")
-    print(f"✅ 最优 CV F1 分数: {svm_grid.best_score_:.4f}")
+    print(f"\n✅ Best parameters: {svm_grid.best_params_}")
+    print(f"✅ Best CV F1 score: {svm_grid.best_score_:.4f}")
 
     y_pred_svm = svm_grid.best_estimator_.predict(X_test)
-    print(f"\n📊 Linear SVM 测试集报告:")
+    print(f"\n📊 Linear SVM test set report:")
     print(classification_report(y_test, y_pred_svm, digits=4))
 
-    # 3.8 结果对比
+    # 3.8 Result comparison
     print("\n" + "=" * 70)
-    print(" 🏆 最终对比结果")
+    print(" 🏆 Final comparison results")
     print("=" * 70)
-    print(f"{'模型':<20} {'最优 CV F1':<15} {'测试集 F1':<15}")
+    print(f"{'Model':<20} {'Best CV F1':<15} {'Test F1':<15}")
     print("-" * 50)
     print(f"{'LogisticRegression':<20} {lr_grid.best_score_:<15.4f} {f1_score(y_test, y_pred_lr):<15.4f}")
     print(f"{'LinearSVM':<20} {svm_grid.best_score_:<15.4f} {f1_score(y_test, y_pred_svm):<15.4f}")
 
     print("\n" + "=" * 70)
-    print(" 🎉 第二阶段任务完成！")
+    print(" 🎉 Phase 2 task complete!")
     print("=" * 70)
 
 

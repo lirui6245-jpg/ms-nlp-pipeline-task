@@ -23,7 +23,7 @@ from sklearn.metrics import (classification_report, f1_score, precision_score,
 import xgboost as xgb
 
 # =====================================================================
-# 0. 数据
+# 0. Data
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -128,7 +128,7 @@ class SentimentWeighter:
         return weighted
 
 # =====================================================================
-# 1. 准备数据
+# 1. Prepare data
 # =====================================================================
 def prepare_tfidf_data():
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
@@ -178,7 +178,7 @@ def prepare_seq_data():
         seq = [word2idx.get(w, word2idx["<UNK>"]) for w in doc]
         sequences.append(seq)
 
-    # 分层划分训练/验证/测试 (6:2:2)，保证各子集均含正负样本
+    # Stratified split into train/val/test (6:2:2) so every subset has both classes
     indices = list(range(len(sequences)))
     train_idx, temp_idx, _, temp_labels = train_test_split(
         indices, labels, test_size=0.4, random_state=42, stratify=labels
@@ -190,7 +190,7 @@ def prepare_seq_data():
     return (train_idx, val_idx, test_idx, sequences, labels, word2idx)
 
 # =====================================================================
-# 2. 深度学习模型定义
+# 2. Deep learning model definitions
 # =====================================================================
 class TextDataset(Dataset):
     def __init__(self, sequences, labels):
@@ -276,7 +276,7 @@ class BiLSTMFixed(nn.Module):
         return self.sigmoid(self.fc2(x))
 
 # =====================================================================
-# 3. 训练与评估
+# 3. Training and evaluation
 # =====================================================================
 def train_torch_model(model, train_loader, val_loader, criterion, optimizer, epochs=100, patience=5):
     best_val_loss = float('inf')
@@ -356,14 +356,14 @@ def eval_sklearn_model(model, X_test, y_test):
     }
 
 # =====================================================================
-# 4. 主流程
+# 4. Main pipeline
 # =====================================================================
 def main():
     print("=" * 70)
     print(" 📊 Phase 4 Task 3: All Models Summary & Confusion Matrices")
     print("=" * 70)
 
-    # 准备数据
+    # Prepare data
     X_train, X_test, y_train, y_test = prepare_tfidf_data()
     train_idx, val_idx, test_idx, sequences, labels, word2idx = prepare_seq_data()
 
@@ -382,10 +382,10 @@ def main():
     results = []
 
     # =====================================================================
-    # 4.1 传统机器学习模型
+    # 4.1 Traditional machine learning models
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 🤖 训练传统机器学习模型")
+    print(" 🤖 Training traditional machine learning models")
     print("=" * 70)
 
     # LR
@@ -425,12 +425,12 @@ def main():
     print(f"✅ F1={r['f1']:.4f} AUC={r['auc']:.4f}")
 
     # =====================================================================
-    # 4.2 深度学习模型
+    # 4.2 Deep learning models
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 🧠 训练深度学习模型")
+    print(" 🧠 Training deep learning models")
     print("=" * 70)
-    torch.manual_seed(42)  # 固定 PyTorch 随机种子，保证实验可复现
+    torch.manual_seed(42)  # Fix PyTorch random seed for reproducibility
     criterion = nn.BCELoss()
     vocab_size = len(word2idx)
 
@@ -465,18 +465,18 @@ def main():
     print(f"✅ F1={r['f1']:.4f} AUC={r['auc']:.4f}")
 
     # =====================================================================
-    # 5. 汇总表 + 混淆矩阵
+    # 5. Summary table + confusion matrices
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 🏆 全部模型性能汇总表")
+    print(" 🏆 All Models Performance Summary")
     print("=" * 70)
-    print(f"{'模型':<20} {'Precision':<12} {'Recall':<12} {'F1':<12} {'AUC':<12}")
+    print(f"{'Model':<20} {'Precision':<12} {'Recall':<12} {'F1':<12} {'AUC':<12}")
     print("-" * 70)
     for r in results:
         print(f"{r['model']:<20} {r['precision']:<12.4f} {r['recall']:<12.4f} {r['f1']:<12.4f} {r['auc']:<12.4f}")
 
     print("\n" + "=" * 70)
-    print(" 📋 各模型混淆矩阵")
+    print(" 📋 Confusion Matrices per Model")
     print("=" * 70)
     for r in results:
         print(f"\n{r['model']}:")
@@ -484,7 +484,7 @@ def main():
         print(f"  FN={r['cm'][1][0]:<3} TP={r['cm'][1][1]:<3}")
 
     print("\n" + "=" * 70)
-    print(" 🎉 任务三完成！")
+    print(" 🎉 Task 3 complete!")
     print("=" * 70)
 
 

@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
 # =====================================================================
-# 0. 模拟企业级业务语料库 (1=正向评价/好评, 0=负向评价/差评)
+# 0. Simulated enterprise-grade business corpus (1=positive review, 0=negative review)
 # =====================================================================
 RAW_CORPUS = [
     ("这款笔记本电脑的性能真的太强了！散热超级好，非常推荐购买。😊", 1),
@@ -25,41 +25,41 @@ RAW_CORPUS = [
 ]
 
 # =====================================================================
-# 1. 任务一：工业级文本清洗管道 (Text Preprocessing Pipeline)
+# 1. Task 1: Industrial-grade text cleaning pipeline (Text Preprocessing Pipeline)
 # =====================================================================
 class TextPreprocessor:
-    """工业级文本预处理器：处理繁简转换、噪声过滤、分词与分句"""
+    """Industrial-grade text preprocessor: handles Traditional/Simplified conversion, noise filtering, tokenization and sentence splitting"""
     def __init__(self, stop_words: List[str] = None):
         self.stop_words = set(stop_words) if stop_words else set()
 
     def clean_text(self, text: str) -> str:
-        # 移除 HTML 标签与 URL
+        # Remove HTML tags and URLs
         text = re.sub(r'<.*?>|http\S+|www\S+', '', text)
-        # 繁体转简体
+        # Traditional to Simplified Chinese
         text = zhconv.convert(text, 'zh-cn')
-        # 正则过滤：保留中英文、数字、中英文基础标点（去除表情符号与特殊不可见乱码）
+        # Regex filter: keep Chinese/English letters, digits and basic punctuation (removes emoji and invisible garbage)
         text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9，。！？、；：]', '', text)
-        # 压缩多余空格
+        # Collapse extra whitespace
         return re.sub(r'\s+', ' ', text).strip()
 
     def split_sentences(self, text: str) -> List[str]:
-        """按标点对长文本进行细粒度分句"""
+        """Split long text into fine-grained sentences by punctuation"""
         sentences = re.split(r'[。！？；]+', text)
         return [s.strip() for s in sentences if s.strip()]
 
     def tokenize(self, text: str) -> List[str]:
-        """结巴分词并剔除停用词与标点"""
+        """Jieba tokenization with stopword and punctuation removal"""
         tokens = jieba.cut(text)
         return [t for t in tokens if t.strip() and t not in self.stop_words
                 and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 
 # =====================================================================
-# 2. 任务二：手写标准 TF-IDF 特征提取器
+# 2. Task 2: Hand-written standard TF-IDF feature extractor
 # =====================================================================
 class CustomTfidfVectorizer:
     """
-    手写实现 TF-IDF 算法，严格遵循 sklearn 平滑逆文档频率公式：
+    Hand-written TF-IDF implementation, strictly following sklearn's smoothed IDF formula:
     idf(t) = log((1 + n_samples) / (1 + df(t))) + 1
     """
     def __init__(self, max_features: int = 1000):
@@ -101,7 +101,7 @@ class CustomTfidfVectorizer:
 
 
 # =====================================================================
-# 3. 任务三：PyTorch 数据管道与动态 Padding (DataLoader)
+# 3. Task 3: PyTorch data pipeline with dynamic Padding (DataLoader)
 # =====================================================================
 class TextDataset(Dataset):
     def __init__(self, tokenized_docs: List[List[str]], labels: List[int], word2idx: Dict[str, int]):
@@ -118,7 +118,7 @@ class TextDataset(Dataset):
         return torch.tensor(self.data[idx], dtype=torch.long), torch.tensor(self.labels[idx], dtype=torch.float32)
 
 def collate_fn(batch):
-    """自定义批处理函数：实现当前 Batch 内部的动态 Padding，节省内存与显存"""
+    """Custom collate function: dynamic padding within the current batch to save memory and GPU memory"""
     sequences, labels = zip(*batch)
     lengths = [len(seq) for seq in sequences]
     max_len = max(lengths) if max(lengths) > 0 else 1
@@ -132,42 +132,42 @@ def collate_fn(batch):
 
 
 # =====================================================================
-# 4. 任务三：双向 LSTM (BiLSTM) 深度学习模型
+# 4. Task 3: Bidirectional LSTM (BiLSTM) deep learning model
 # =====================================================================
 class BiLSTMClassifier(nn.Module):
     def __init__(self, vocab_size: int, embed_dim: int = 32, hidden_dim: int = 32, dropout_rate: float = 0.2):
         super(BiLSTMClassifier, self).__init__()
-        # 词嵌入层：padding_idx=0 确保填充位置不参与梯度计算与更新
+        # Embedding layer: padding_idx=0 keeps padding positions out of gradient computation and updates
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
         self.dropout = nn.Dropout(dropout_rate)
-        # 双向 LSTM：捕获上下文双向特征
+        # Bidirectional LSTM: captures bidirectional context features
         self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True, bidirectional=True)
-        # 双向输出维度需乘 2
+        # Bidirectional output dimension must be multiplied by 2
         self.fc = nn.Linear(hidden_dim * 2, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         embeds = self.dropout(self.embedding(x))
         lstm_out, _ = self.lstm(embeds)
-        # 提取序列时序全局平均池化特征
+        # Extract global average pooling features over the sequence timeline
         pooled_out = torch.mean(lstm_out, dim=1)
         logits = self.fc(pooled_out)
         return self.sigmoid(logits)
 
 
 # =====================================================================
-# 5. 主流程控制管道 (Main Execution Pipeline)
+# 5. Main Execution Pipeline (Main Execution Pipeline)
 # =====================================================================
 def main():
     print("=" * 70)
     print(" 💼 Microsoft Internship Technical Task: NLP Engineering Pipeline")
     print("=" * 70)
 
-    # 5.1 文本清洗与分句
+    # 5.1 Text cleaning and sentence splitting
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
     cleaned_texts, tokenized_docs, labels = [], [], []
 
-    print("\n--- [Step 1: 文本预处理与分句分析] ---")
+    print("\n--- [Step 1: Text Preprocessing and Sentence Analysis] ---")
     for text, label in RAW_CORPUS:
         clean_t = preprocessor.clean_text(text)
         tokens = preprocessor.tokenize(clean_t)
@@ -176,22 +176,22 @@ def main():
         labels.append(label)
 
     sample_idx = 0
-    print(f" -> 原始输入文本: {RAW_CORPUS[sample_idx][0]}")
-    print(f" -> 繁简转换与过滤: {cleaned_texts[sample_idx]}")
-    print(f" -> 细粒度分句切分: {preprocessor.split_sentences(cleaned_texts[sample_idx])}")
-    print(f" -> 结巴去噪分词结果: {tokenized_docs[sample_idx]}")
+    print(f" -> Raw input text: {RAW_CORPUS[sample_idx][0]}")
+    print(f" -> Traditional/Simplified conversion and filtering: {cleaned_texts[sample_idx]}")
+    print(f" -> Fine-grained sentence splitting: {preprocessor.split_sentences(cleaned_texts[sample_idx])}")
+    print(f" -> Jieba denoised tokenization result: {tokenized_docs[sample_idx]}")
 
-    # 5.2 TF-IDF 特征提取
-    print("\n--- [Step 2: 手写 CustomTfidfVectorizer 特征空间拟合] ---")
+    # 5.2 TF-IDF feature extraction
+    print("\n--- [Step 2: Fitting the hand-written CustomTfidfVectorizer feature space] ---")
     tfidf_vectorizer = CustomTfidfVectorizer(max_features=500)
     tfidf_matrix = tfidf_vectorizer.fit_transform(tokenized_docs)
     
     sample_tfidf = sorted(tfidf_matrix[sample_idx].items(), key=lambda x: x[1], reverse=True)
-    print(f" -> 构建有效词表空间 (Vocab Size): {len(tfidf_vectorizer.vocab)}")
-    print(f" -> 样本 01 权重最高 TOP 5 关键词特征: {sample_tfidf[:5]}")
+    print(f" -> Built effective vocabulary (Vocab Size): {len(tfidf_vectorizer.vocab)}")
+    print(f" -> Top 5 highest-weighted keyword features for sample 01: {sample_tfidf[:5]}")
 
-    # 5.3 构建深度学习张量管道
-    print("\n--- [Step 3: 构建 BiLSTM 神经网络动态管道] ---")
+    # 5.3 Build the deep learning tensor pipeline
+    print("\n--- [Step 3: Building the BiLSTM neural network dynamic pipeline] ---")
     word2idx = {"<PAD>": 0, "<UNK>": 1}
     for doc in tokenized_docs:
         for word in doc:
@@ -200,10 +200,10 @@ def main():
     
     dataset = TextDataset(tokenized_docs, labels, word2idx)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
-    print(f" -> 序列化词表总数: {len(word2idx)} | 批次数量 (Batches): {len(dataloader)}")
+    print(f" -> Total serialized vocabulary size: {len(word2idx)} | Number of batches (Batches): {len(dataloader)}")
 
-    # 5.4 双向 LSTM 模型训练
-    print("\n--- [Step 4: 训练双向 LSTM (BiLSTM) 情感二分类模型] ---")
+    # 5.4 Bidirectional LSTM model training
+    print("\n--- [Step 4: Training the bidirectional LSTM (BiLSTM) sentiment binary classifier] ---")
     model = BiLSTMClassifier(vocab_size=len(word2idx), embed_dim=16, hidden_dim=16, dropout_rate=0.2)
     criterion = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.02, weight_decay=1e-4)
@@ -227,10 +227,10 @@ def main():
         avg_loss = total_loss / total_samples
         accuracy = (correct / total_samples) * 100
         if epoch % 3 == 0 or epoch == 1:
-            print(f" -> Epoch [{epoch:02d}/15] | 平均损失 (Loss): {avg_loss:.4f} | 训练集准确率 (Acc): {accuracy:.2f}%")
+            print(f" -> Epoch [{epoch:02d}/15] | Average Loss: {avg_loss:.4f} | Training Accuracy (Acc): {accuracy:.2f}%")
 
     print("\n" + "=" * 70)
-    print(" 🎉 任务完成！管道化代码通过验证。")
+    print(" 🎉 Task complete! The pipelined code passed validation.")
     print("=" * 70)
 
 if __name__ == "__main__":

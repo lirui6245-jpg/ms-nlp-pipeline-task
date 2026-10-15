@@ -1,4 +1,4 @@
-# 自动生成扩充的模拟数据，用于支持5折交叉验证
+# Auto-generate augmented simulated data to support 5-fold cross validation
 import random
 
 positive_templates = [
@@ -33,19 +33,19 @@ negative_words = ["很差", "糟糕", "垃圾", "极差", "烂透了", "不行",
 def generate_corpus(n_per_class=15):
     corpus = []
     
-    # 生成正样本
+    # Generate positive samples
     for i in range(n_per_class):
         template = random.choice(positive_templates)
-        # 数一下模板里有几个 {}
+        # Count how many {} placeholders are in the template
         n_slots = template.count("{}")
         words = random.sample(positive_words, n_slots)
         text = template.format(*words)
-        # 随机加一些变化
+        # Add some random variation
         if random.random() > 0.5:
             text = text.replace("，", "！").replace("。", "！")
         corpus.append((text, 1))
     
-    # 生成负样本
+    # Generate negative samples
     for i in range(n_per_class):
         template = random.choice(negative_templates)
         n_slots = template.count("{}")
@@ -57,10 +57,10 @@ def generate_corpus(n_per_class=15):
     
     return corpus
 
-# 生成30条数据（每类15条），足够支持5折交叉验证
+# Generate 30 samples (15 per class), enough to support 5-fold cross validation
 new_corpus = generate_corpus(15)
 
-# 打印成 Python 代码格式
+# Print in Python code format
 print("RAW_CORPUS = [")
 for text, label in new_corpus:
     print(f'    ("{text}", {label}),')

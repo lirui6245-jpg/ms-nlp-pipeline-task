@@ -17,7 +17,7 @@ import xgboost as xgb
 import numpy as np
 
 # =====================================================================
-# 0. 数据（使用最优特征：Uni-gram + Sentiment）
+# 0. Data (using the best features: Uni-gram + Sentiment)
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -122,7 +122,7 @@ class SentimentWeighter:
         return weighted
 
 # =====================================================================
-# 1. 数据预处理
+# 1. Data preprocessing
 # =====================================================================
 def prepare_data():
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
@@ -142,7 +142,7 @@ def prepare_data():
     weighter = SentimentWeighter()
     tfidf_matrix = [weighter.apply_weight(vec) for vec in tfidf_matrix]
 
-    # 转 numpy
+    # Convert to numpy
     vocab_list = list(vectorizer.vocab.keys())
     n_samples = len(tfidf_matrix)
     n_features = len(vocab_list)
@@ -157,14 +157,14 @@ def prepare_data():
     return train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
 # =====================================================================
-# 2. 模型训练与评估
+# 2. Model training and evaluation
 # =====================================================================
 def evaluate_model(model, X_train, X_test, y_train, y_test, model_name):
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else model.decision_function(X_test)
     
-    # 归一化 decision_function 到 [0,1] 用于 AUC
+    # Normalize decision_function to [0,1] for AUC
     if not hasattr(model, 'predict_proba'):
         y_prob = (y_prob - y_prob.min()) / (y_prob.max() - y_prob.min() + 1e-10)
     
@@ -181,7 +181,7 @@ def evaluate_model(model, X_train, X_test, y_train, y_test, model_name):
     print(f"Recall:    {recall:.4f}")
     print(f"F1-Score:  {f1:.4f}")
     print(f"AUC:       {auc:.4f}")
-    print(f"\n混淆矩阵:")
+    print(f"\nConfusion matrix:")
     print(cm)
     
     return {
@@ -203,18 +203,18 @@ def main():
 
     results = []
 
-    # 2.1 Logistic Regression (最优参数)
-    print("\n--- [训练 LogisticRegression] ---")
+    # 2.1 Logistic Regression (best parameters)
+    print("\n--- [Training LogisticRegression] ---")
     lr = LogisticRegression(C=10, penalty='l2', solver='liblinear', random_state=42)
     results.append(evaluate_model(lr, X_train, X_test, y_train, y_test, "LogisticRegression"))
 
-    # 2.2 Linear SVM (最优参数)
-    print("\n--- [训练 LinearSVM] ---")
+    # 2.2 Linear SVM (best parameters)
+    print("\n--- [Training LinearSVM] ---")
     svm = LinearSVC(C=10, penalty='l2', loss='hinge', max_iter=5000, random_state=42)
     results.append(evaluate_model(svm, X_train, X_test, y_train, y_test, "LinearSVM"))
 
     # 2.3 Random Forest
-    print("\n--- [训练 RandomForest] ---")
+    print("\n--- [Training RandomForest] ---")
     rf_params = {
         'n_estimators': [50, 100, 200],
         'max_depth': [3, 5, 10, None],
@@ -222,11 +222,11 @@ def main():
     }
     rf_grid = GridSearchCV(RandomForestClassifier(random_state=42), rf_params, cv=cv, scoring='f1', n_jobs=-1)
     rf_grid.fit(X_train, y_train)
-    print(f"✅ RF 最优参数: {rf_grid.best_params_}")
+    print(f"✅ RF best parameters: {rf_grid.best_params_}")
     results.append(evaluate_model(rf_grid.best_estimator_, X_train, X_test, y_train, y_test, "RandomForest"))
 
     # 2.4 XGBoost
-    print("\n--- [训练 XGBoost] ---")
+    print("\n--- [Training XGBoost] ---")
     xgb_params = {
         'max_depth': [3, 5, 7],
         'learning_rate': [0.01, 0.1, 0.3],
@@ -236,22 +236,22 @@ def main():
     xgb_grid = GridSearchCV(xgb.XGBClassifier(random_state=42, eval_metric='logloss'), 
                             xgb_params, cv=cv, scoring='f1', n_jobs=-1)
     xgb_grid.fit(X_train, y_train)
-    print(f"✅ XGBoost 最优参数: {xgb_grid.best_params_}")
+    print(f"✅ XGBoost best parameters: {xgb_grid.best_params_}")
     results.append(evaluate_model(xgb_grid.best_estimator_, X_train, X_test, y_train, y_test, "XGBoost"))
 
     # =====================================================================
-    # 3. 汇总表
+    # 3. Summary table
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 🏆 模型性能汇总表")
+    print(" 🏆 Model Performance Summary")
     print("=" * 70)
-    print(f"{'模型':<20} {'Precision':<12} {'Recall':<12} {'F1':<12} {'AUC':<12}")
+    print(f"{'Model':<20} {'Precision':<12} {'Recall':<12} {'F1':<12} {'AUC':<12}")
     print("-" * 70)
     for r in results:
         print(f"{r['model']:<20} {r['precision']:<12.4f} {r['recall']:<12.4f} {r['f1']:<12.4f} {r['auc']:<12.4f}")
 
     print("\n" + "=" * 70)
-    print(" 🎉 任务一完成！")
+    print(" 🎉 Task 1 complete!")
     print("=" * 70)
 
 

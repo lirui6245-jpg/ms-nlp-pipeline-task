@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, f1_score, precision_score, recall_score, roc_auc_score, confusion_matrix
 
 # =====================================================================
-# 0. 数据
+# 0. Data
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -68,7 +68,7 @@ class TextPreprocessor:
                 and not all(ch in '，。！？、；：,.!?;:' for ch in t)]
 
 # =====================================================================
-# 1. TextCNN 模型
+# 1. TextCNN model
 # =====================================================================
 class TextCNN(nn.Module):
     def __init__(self, vocab_size: int, embed_dim: int = 32, num_classes: int = 1, 
@@ -87,7 +87,7 @@ class TextCNN(nn.Module):
         x = self.embedding(x)  # (batch, seq_len, embed_dim)
         x = x.permute(0, 2, 1)  # (batch, embed_dim, seq_len)
         
-        # 多尺度卷积 + ReLU + MaxPool
+        # Multi-scale convolution + ReLU + MaxPool
         pooled = []
         for conv in self.convs:
             conv_out = F.relu(conv(x))  # (batch, num_filters, seq_len - fs + 1)
@@ -101,7 +101,7 @@ class TextCNN(nn.Module):
 
 
 # =====================================================================
-# 2. BiLSTM + Attention 模型
+# 2. BiLSTM + Attention model
 # =====================================================================
 class Attention(nn.Module):
     def __init__(self, hidden_dim: int):
@@ -145,7 +145,7 @@ class BiLSTMAttention(nn.Module):
 
 
 # =====================================================================
-# 3. 修复后的 BiLSTM（任务四版本）
+# 3. Fixed BiLSTM (Task 4 version)
 # =====================================================================
 class BiLSTMFixed(nn.Module):
     def __init__(self, vocab_size: int, embed_dim: int = 16, hidden_dim: int = 16, 
@@ -178,7 +178,7 @@ class BiLSTMFixed(nn.Module):
 
 
 # =====================================================================
-# 4. 数据管道
+# 4. Data pipeline
 # =====================================================================
 class TextDataset(Dataset):
     def __init__(self, sequences, labels):
@@ -201,7 +201,7 @@ def collate_fn(batch):
 
 
 # =====================================================================
-# 5. 训练工具
+# 5. Training utilities
 # =====================================================================
 class EarlyStopping:
     def __init__(self, patience=5, min_delta=0.001):
@@ -224,7 +224,7 @@ class EarlyStopping:
 
 
 def train_model(model, train_loader, val_loader, criterion, optimizer, model_name, epochs=100, patience=5):
-    print(f"\n--- [训练 {model_name}] ---")
+    print(f"\n--- [Training {model_name}] ---")
     early_stop = EarlyStopping(patience=patience)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)
     best_val_f1 = 0
@@ -304,7 +304,7 @@ def evaluate_model(model, test_loader):
 
 
 # =====================================================================
-# 6. 主流程
+# 6. Main pipeline
 # =====================================================================
 def main():
     print("=" * 70)
@@ -312,7 +312,7 @@ def main():
     print("    TextCNN | BiLSTM+Attention | BiLSTM(Fixed) vs LinearSVM")
     print("=" * 70)
 
-    # 6.1 数据预处理
+    # 6.1 Data preprocessing
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
     tokenized_docs = []
     labels = []
@@ -323,7 +323,7 @@ def main():
         tokenized_docs.append(tokens)
         labels.append(label)
 
-    # 构建词表
+    # Build vocabulary
     word2idx = {"<PAD>": 0, "<UNK>": 1}
     for doc in tokenized_docs:
         for word in doc:
@@ -335,7 +335,7 @@ def main():
         seq = [word2idx.get(w, word2idx["<UNK>"]) for w in doc]
         sequences.append(seq)
 
-    # 分层划分训练/验证/测试 (6:2:2)，保证各子集均含正负样本
+    # Stratified split into train/val/test (6:2:2) so every subset has both classes
     indices = list(range(len(sequences)))
     train_idx, temp_idx, _, temp_labels = train_test_split(
         indices, labels, test_size=0.4, random_state=42, stratify=labels
@@ -357,7 +357,7 @@ def main():
     test_loader = DataLoader(TextDataset(test_seqs, test_labels), batch_size=4, collate_fn=collate_fn)
 
     vocab_size = len(word2idx)
-    torch.manual_seed(42)  # 固定 PyTorch 随机种子，保证实验可复现
+    torch.manual_seed(42)  # Fix PyTorch random seed for reproducibility
     criterion = nn.BCELoss()
     results = []
 
@@ -367,7 +367,7 @@ def main():
     train_model(cnn, train_loader, val_loader, criterion, optimizer_cnn, "TextCNN", epochs=100, patience=5)
     p, r, f1, auc, cm = evaluate_model(cnn, test_loader)
     print(f"\n✅ TextCNN | P:{p:.4f} R:{r:.4f} F1:{f1:.4f} AUC:{auc:.4f}")
-    print(f"混淆矩阵:\n{cm}")
+    print(f"Confusion matrix:\n{cm}")
     results.append({"model": "TextCNN", "precision": p, "recall": r, "f1": f1, "auc": auc, "cm": cm})
 
     # 6.3 BiLSTM + Attention
@@ -376,35 +376,35 @@ def main():
     train_model(lstm_attn, train_loader, val_loader, criterion, optimizer_attn, "BiLSTM+Attention", epochs=100, patience=5)
     p, r, f1, auc, cm = evaluate_model(lstm_attn, test_loader)
     print(f"\n✅ BiLSTM+Attention | P:{p:.4f} R:{r:.4f} F1:{f1:.4f} AUC:{auc:.4f}")
-    print(f"混淆矩阵:\n{cm}")
+    print(f"Confusion matrix:\n{cm}")
     results.append({"model": "BiLSTM+Attention", "precision": p, "recall": r, "f1": f1, "auc": auc, "cm": cm})
 
-    # 6.4 BiLSTM Fixed (任务四版本)
+    # 6.4 BiLSTM Fixed (Task 4 version)
     lstm_fixed = BiLSTMFixed(vocab_size, embed_dim=16, hidden_dim=16, dropout_rate=0.5, num_layers=2)
     optimizer_fixed = torch.optim.Adam(lstm_fixed.parameters(), lr=0.01, weight_decay=1e-3)
     train_model(lstm_fixed, train_loader, val_loader, criterion, optimizer_fixed, "BiLSTM(Fixed)", epochs=100, patience=5)
     p, r, f1, auc, cm = evaluate_model(lstm_fixed, test_loader)
     print(f"\n✅ BiLSTM(Fixed) | P:{p:.4f} R:{r:.4f} F1:{f1:.4f} AUC:{auc:.4f}")
-    print(f"混淆矩阵:\n{cm}")
+    print(f"Confusion matrix:\n{cm}")
     results.append({"model": "BiLSTM(Fixed)", "precision": p, "recall": r, "f1": f1, "auc": auc, "cm": cm})
 
-    # 6.5 汇总表
+    # 6.5 Summary table
     print("\n" + "=" * 70)
-    print(" 🏆 深度学习模型性能汇总")
+    print(" 🏆 Deep Learning Model Performance Summary")
     print("=" * 70)
-    print(f"{'模型':<20} {'Precision':<12} {'Recall':<12} {'F1':<12} {'AUC':<12}")
+    print(f"{'Model':<20} {'Precision':<12} {'Recall':<12} {'F1':<12} {'AUC':<12}")
     print("-" * 70)
     for r in results:
         print(f"{r['model']:<20} {r['precision']:<12.4f} {r['recall']:<12.4f} {r['f1']:<12.4f} {r['auc']:<12.4f}")
 
-    print("\n💡 分析:")
-    print("- TextCNN 通过多尺度卷积捕获局部特征，适合短文本")
-    print("- BiLSTM+Attention 引入注意力机制，可解释性更强")
-    print("- 小数据集下深度学习模型难以发挥优势，参数量过大")
-    print("- LinearSVM 在 30 条样本上仍是最优选择")
+    print("\n💡 Analysis:")
+    print("- TextCNN captures local features via multi-scale convolution, suited to short texts")
+    print("- BiLSTM+Attention adds an attention mechanism for better interpretability")
+    print("- On small datasets deep models struggle to show their advantage; too many parameters")
+    print("- LinearSVM remains the best choice on 30 samples")
 
     print("\n" + "=" * 70)
-    print(" 🎉 任务二完成！")
+    print(" 🎉 Task 2 complete!")
     print("=" * 70)
 
 

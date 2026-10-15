@@ -16,7 +16,7 @@ from sklearn.metrics import classification_report, f1_score
 import numpy as np
 
 # =====================================================================
-# 0. 模拟企业级业务语料库 (扩充至30条)
+# 0. Simulated enterprise-grade business corpus (expanded to 30 samples)
 # =====================================================================
 RAW_CORPUS = [
     ("设计精美！外观贴心！不错喜欢！", 1),
@@ -52,7 +52,7 @@ RAW_CORPUS = [
 ]
 
 # =====================================================================
-# 1. 文本清洗管道
+# 1. Text cleaning pipeline
 # =====================================================================
 class TextPreprocessor:
     def __init__(self, stop_words: List[str] = None):
@@ -71,7 +71,7 @@ class TextPreprocessor:
 
 
 # =====================================================================
-# 2. 手写 TF-IDF 特征提取器
+# 2. Hand-written TF-IDF feature extractor
 # =====================================================================
 class CustomTfidfVectorizer:
     def __init__(self, max_features: int = 1000):
@@ -113,14 +113,14 @@ class CustomTfidfVectorizer:
 
 
 # =====================================================================
-# 3. 消融实验：L1 / L2 / Elastic Net 正则对比
+# 3. Ablation study: L1 / L2 / Elastic Net regularization comparison
 # =====================================================================
 def main():
     print("=" * 70)
     print(" 🔬 Ablation Study: L1 / L2 / Elastic Net Regularization")
     print("=" * 70)
 
-    # 3.1 数据预处理
+    # 3.1 Data preprocessing
     preprocessor = TextPreprocessor(stop_words=["的", "了", "和", "是", "就", "也"])
     tokenized_docs = []
     labels = []
@@ -131,13 +131,13 @@ def main():
         tokenized_docs.append(tokens)
         labels.append(label)
 
-    # 3.2 TF-IDF 特征提取
-    print("\n--- [Step 1: 手写 TF-IDF 特征提取] ---")
+    # 3.2 TF-IDF feature extraction
+    print("\n--- [Step 1: Hand-written TF-IDF feature extraction] ---")
     tfidf_vectorizer = CustomTfidfVectorizer(max_features=500)
     tfidf_matrix = tfidf_vectorizer.fit_transform(tokenized_docs)
-    print(f" -> 词表大小: {len(tfidf_vectorizer.vocab)}")
+    print(f" -> Vocabulary size: {len(tfidf_vectorizer.vocab)}")
 
-    # 转换为 numpy 矩阵
+    # Convert to a numpy matrix
     vocab_list = list(tfidf_vectorizer.vocab.keys())
     n_samples = len(tfidf_matrix)
     n_features = len(vocab_list)
@@ -149,30 +149,30 @@ def main():
                 X[i, j] = value
     y = np.array(labels)
 
-    # 划分数据集
+    # Split the dataset
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # 5折交叉验证
+    # 5-fold cross validation
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
     # =====================================================================
-    # 3.3 Logistic Regression 消融实验
+    # 3.3 Logistic Regression ablation study
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 📊 Logistic Regression: L1 / L2 / Elastic Net 消融实验")
+    print(" 📊 Logistic Regression: L1 / L2 / Elastic Net ablation study")
     print("=" * 70)
 
     lr_configs = [
-        {"name": "L1正则", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l1'], 'solver': ['liblinear'], 'max_iter': [1000]}},
-        {"name": "L2正则", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l2'], 'solver': ['liblinear'], 'max_iter': [1000]}},
+        {"name": "L1 Regularization", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l1'], 'solver': ['liblinear'], 'max_iter': [1000]}},
+        {"name": "L2 Regularization", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l2'], 'solver': ['liblinear'], 'max_iter': [1000]}},
         {"name": "ElasticNet", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['elasticnet'], 'solver': ['saga'], 'l1_ratio': [0.3, 0.5, 0.7], 'max_iter': [2000]}},
     ]
 
     lr_results = []
     for config in lr_configs:
-        print(f"\n--- 正在训练: {config['name']} ---")
+        print(f"\n--- Training: {config['name']} ---")
         grid = GridSearchCV(
             LogisticRegression(random_state=42),
             config['params'],
@@ -186,8 +186,8 @@ def main():
         y_pred = grid.best_estimator_.predict(X_test)
         test_f1 = f1_score(y_test, y_pred)
         
-        print(f"✅ 最优参数: {grid.best_params_}")
-        print(f"✅ CV F1: {grid.best_score_:.4f} | 测试集 F1: {test_f1:.4f}")
+        print(f"✅ Best parameters: {grid.best_params_}")
+        print(f"✅ CV F1: {grid.best_score_:.4f} | Test F1: {test_f1:.4f}")
         
         lr_results.append({
             'name': config['name'],
@@ -198,20 +198,20 @@ def main():
         })
 
     # =====================================================================
-    # 3.4 Linear SVM 消融实验 (L1 / L2)
+    # 3.4 Linear SVM ablation study (L1 / L2)
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 📊 Linear SVM: L1 / L2 消融实验")
+    print(" 📊 Linear SVM: L1 / L2 ablation study")
     print("=" * 70)
 
     svm_configs = [
-        {"name": "L1正则", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l1'], 'loss': ['squared_hinge'], 'dual': [False], 'max_iter': [5000]}},
-        {"name": "L2正则", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l2'], 'loss': ['hinge', 'squared_hinge'], 'dual': [True], 'max_iter': [5000]}},
+        {"name": "L1 Regularization", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l1'], 'loss': ['squared_hinge'], 'dual': [False], 'max_iter': [5000]}},
+        {"name": "L2 Regularization", "params": {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'penalty': ['l2'], 'loss': ['hinge', 'squared_hinge'], 'dual': [True], 'max_iter': [5000]}},
     ]
 
     svm_results = []
     for config in svm_configs:
-        print(f"\n--- 正在训练: {config['name']} ---")
+        print(f"\n--- Training: {config['name']} ---")
         grid = GridSearchCV(
             LinearSVC(random_state=42),
             config['params'],
@@ -225,8 +225,8 @@ def main():
         y_pred = grid.best_estimator_.predict(X_test)
         test_f1 = f1_score(y_test, y_pred)
         
-        print(f"✅ 最优参数: {grid.best_params_}")
-        print(f"✅ CV F1: {grid.best_score_:.4f} | 测试集 F1: {test_f1:.4f}")
+        print(f"✅ Best parameters: {grid.best_params_}")
+        print(f"✅ CV F1: {grid.best_score_:.4f} | Test F1: {test_f1:.4f}")
         
         svm_results.append({
             'name': config['name'],
@@ -237,10 +237,10 @@ def main():
         })
 
     # =====================================================================
-    # 3.5 输出关键词权重对比
+    # 3.5 Output keyword weight comparison
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 🔑 关键词权重对比 (Top 10)")
+    print(" 🔑 Keyword weight comparison (Top 10)")
     print("=" * 70)
 
     def print_top_weights(model, model_name, vocab_list):
@@ -259,12 +259,12 @@ def main():
         print_top_weights(r['model'], f"SVM-{r['name']}", vocab_list)
 
     # =====================================================================
-    # 3.6 结果汇总
+    # 3.6 Result summary
     # =====================================================================
     print("\n" + "=" * 70)
-    print(" 🏆 消融实验结果汇总")
+    print(" 🏆 Ablation study result summary")
     print("=" * 70)
-    print(f"{'模型':<25} {'CV F1':<12} {'测试集 F1':<12}")
+    print(f"{'Model':<25} {'CV F1':<12} {'Test F1':<12}")
     print("-" * 50)
     for r in lr_results:
         print(f"{'LR-' + r['name']:<25} {r['cv_f1']:<12.4f} {r['test_f1']:<12.4f}")
@@ -272,7 +272,7 @@ def main():
         print(f"{'SVM-' + r['name']:<25} {r['cv_f1']:<12.4f} {r['test_f1']:<12.4f}")
 
     print("\n" + "=" * 70)
-    print(" 🎉 消融实验完成！")
+    print(" 🎉 Ablation study complete!")
     print("=" * 70)
 
 
